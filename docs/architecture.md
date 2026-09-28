@@ -1,55 +1,81 @@
 # Architecture
 
-## Intended shape
+## Purpose
 
-CAI is a control plane, not an in-workspace coding agent. It decides whether work may begin, creates a bounded execution context, records evidence, and delivers results through GitHub.
+CAI is an open-source, GitHub-native harness for AI coding agents. GitHub is the source of truth for repository collaboration, pull requests, checks, artifacts, and review. CAI does not introduce a custom worker, queue, or persistent execution service in the MVP.
+
+## Execution model
+
+A GitHub Actions workflow is the execution plane. It may run on GitHub-hosted runners or operator-managed self-hosted runners. The operator chooses the host platform and provisioning method.
+
+Every task executes in one container with a clean workspace and scoped mounts. A task container has a 60-minute wall-clock limit by default; repository policy may lower that limit. Resource limits and outbound-network policy are not standardized in the MVP.
 
 ```text
-GitHub App webhook
-  -> event verifier and idempotency gate
-  -> policy engine
-  -> durable run ledger and queue
-  -> runner dispatcher
-  -> isolated runner workspace
+GitHub issue or pull request event
+  -> CAI workflow trigger
+  -> workflow policy resolution
+  -> clean task container
   -> provider adapter and agent process
-  -> verification collector
-  -> GitHub draft pull request and status updates
+  -> verification and evidence collection
+  -> GitHub check, artifact, comment, or draft pull request
 ```
 
-## Components
+## Invocation
 
-### GitHub integration
+CAI recognizes two ways to start a run:
 
-Receives verified GitHub App events, resolves the installation and repository, posts status updates, and creates draft pull requests. It must not use a human personal access token for normal operation.
+- A CAI label on an issue or pull request.
+- A comment whose first non-empty line starts with `@cai-agent <instruction>`.
 
-### Policy engine
+Labels and the exact command syntax are the invocation authority. The MVP does not add a separate CAI actor allowlist. A parser must ignore mentions that do not exactly match the command form.
 
-Evaluates the repository policy before dispatch. It decides whether an event is eligible, which runner pool and provider adapter are allowed, whether planning approval is required, which tools and network destinations are allowed, and whether the run is read-only or write-capable.
+## Policy resolution
 
-### Run ledger
+Repository policy resolves the task mode, provider, model, execution permissions, and review behavior.
 
-Stores the immutable lifecycle of a run: event identity, initiator, repository revision, policy decision, credentials issued, runner identity, provider adapter, tool events, test evidence, cost or usage metadata, and terminal outcome.
+- CAI selects a provider and model automatically from repository policy and required capabilities.
+- Authorized provider/model labels may override the automatic selection.
+- The resolved provider, model, adapter version, and task revision are recorded in the run evidence.
+- Policy is enforced by the workflow and harness, not delegated to the agent prompt.
 
-### Dispatcher and runner pools
+## Provider adapters
 
-Dispatches approved runs only to eligible pools. A runner pool is explicitly bound to repositories and has a declared trust level, platform, capacity, and egress policy. Each task receives an isolated workspace.
+Provider adapters implement a common CAI run contract. An adapter owns provider-specific invocation, streamed events, cancellation, authentication handoff, and normalized output. It does not own GitHub authorization or repository policy.
 
-### Provider adapters
+The first implementation validates this contract with a deterministic mock adapter. It does not require an external provider connection. The first end-to-end proof is a plan-only run: a `cai` label starts the mock adapter, uploads evidence, and makes no repository changes.
 
-Translate CAI's internal run contract into a provider-specific agent invocation. Adapters are responsible for capability discovery, streamed events, cancellation, provider authentication handoff, and normalized results. They must not own repository authorization.
+## GitHub outputs and evidence
 
-### Verification collector
+A run publishes its state through GitHub checks and workflow logs. The workflow uploads one run artifact containing the effective prompt, raw execution logs, structured events, verification output, and result metadata.
 
-Runs or captures the repository-defined checks, packages their output as evidence, and makes the final outcome available to GitHub and the run ledger.
+Artifacts and workflow logs are retained for seven days by default. Repository policy may reduce retention to one through six days.
+
+A write-capable implementation run may create or update a draft pull request. CAI does not merge pull requests, deploy software, force-push branches, modify protected branches, or widen its own permissions.
+
+## Optional independent review
+
+Independent review is configured per repository and supports two trigger modes:
+
+- `manual` — the default; a review command starts the review.
+- `on_pr_update` — review runs for every new pull-request head revision.
+
+The default review result is a GitHub `COMMENT` plus a `CAI / independent-review` status check. A repository may opt into formal `APPROVE` or `REQUEST_CHANGES` behavior.
+
+A formal gate requires a reviewer run that is independent from the implementation run:
+
+```text
+implementation provider != reviewer provider
+implementation model != reviewer model
+implementation run != reviewer run
+reviewer execution mode == read-only
+```
+
+The reviewer evaluates the exact pull-request head revision, the diff, repository review rules, and verification evidence. If a new commit changes the pull request, the previous verdict does not apply to the new revision.
 
 ## Trust boundaries
 
-- The GitHub event is untrusted until webhook verification and installation resolution succeed.
-- Issue text, pull-request text, repository files, test output, and agent output are untrusted input.
-- An agent can propose actions but cannot bypass control-plane policy.
-- A runner can access only the workspace, credentials, network destinations, and repository granted to its run.
-- Provider credentials stay in a broker or provider-approved workload-identity flow, never in repository files.
-
-## Default outcome
-
-A successful write-capable run creates or updates a draft pull request. Merge, deployment, force-push, protected-branch writes, and privilege escalation are outside the initial architecture.
+- Issue text, pull-request text, repository files, diffs, test output, and agent output are untrusted input.
+- A task container may access only its scoped workspace and mounts.
+- Provider credentials must not be committed to repositories or included in artifacts.
+- A reviewer must not write repository contents, push commits, create branches, or merge pull requests.
+- GitHub review identity, task identity, provider identity, and runner identity are separate concepts and must remain traceable in run evidence.
