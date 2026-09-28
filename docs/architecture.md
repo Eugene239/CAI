@@ -4,6 +4,12 @@
 
 CAI is an open-source, GitHub-native harness for AI coding agents. GitHub is the source of truth for repository collaboration, pull requests, checks, artifacts, and review. CAI does not introduce a custom worker, queue, or persistent execution service in the MVP.
 
+## Implementation shape
+
+The core harness and `cai` CLI are Rust binaries. Rust provides a portable, resource-efficient, memory-safe executable for GitHub Actions and self-hosted runners. A TypeScript wrapper may provide the GitHub Action interface where JavaScript action tooling is required.
+
+CAI is not a sandbox runtime: GitHub Actions and the task container remain the MVP execution boundary. The Rust core orchestrates policy enforcement, provider adapters, process lifecycle, evidence collection, and GitHub-facing outputs.
+
 ## Execution model
 
 A GitHub Actions workflow is the execution plane. It may run on GitHub-hosted runners or operator-managed self-hosted runners. The operator chooses the host platform and provisioning method.

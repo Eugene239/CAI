@@ -10,7 +10,7 @@ Repository-facing content is written in English. Discussion outside the reposito
 
 CAI is in the foundation phase. The repository currently contains architecture and product documentation, not production code.
 
-Do not introduce a programming language, runtime, package manager, framework, provider SDK, or infrastructure dependency until an explicit project decision accepts it.
+CAI's core harness and CLI use Rust. A TypeScript wrapper may be added only for GitHub Action integration. Do not introduce additional languages, runtimes, package managers, frameworks, provider SDKs, or infrastructure dependencies without an explicit project decision.
 
 ## Setup commands
 
