@@ -41,3 +41,16 @@ The first end-to-end proof runs against `Eugene239/CAI` itself:
 6. Confirm that the run is plan-only and creates no code change or pull request.
 
 The POC does not connect a real OAuth provider, execute on an operator-owned self-hosted runner, or create a delivery pull request.
+
+## Current deterministic evidence primitive
+
+The Rust core can write a self-contained, plan-only mock evidence directory named `cai-run-<run-id>` under a caller-selected output root. It contains:
+
+```text
+manifest.json
+result.json
+plan.md
+changed-files.json
+```
+
+The manifest records the format version, run ID, and file names. The result includes the resolved policy snapshot and SHA-256. Run IDs are restricted to ASCII letters, digits, hyphens, and underscores so evidence output cannot create nested paths. The future GitHub Action will upload this directory as part of the repository-native run artifact and add redacted prompt, event, and execution-log evidence.

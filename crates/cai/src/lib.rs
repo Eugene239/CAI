@@ -1,6 +1,11 @@
 #![forbid(unsafe_code)]
 
-use std::{collections::HashMap, error::Error, fmt};
+use std::{
+    collections::HashMap,
+    error::Error,
+    fmt, fs,
+    path::{Path, PathBuf},
+};
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -66,6 +71,20 @@ pub struct TokenUsage {
     pub total_tokens: u64,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub struct EvidenceArtifact {
+    pub directory: PathBuf,
+}
+
+#[derive(Debug, Serialize)]
+struct EvidenceManifest<'a> {
+    format_version: u8,
+    run_id: &'a str,
+    result_file: &'static str,
+    plan_file: &'static str,
+    changed_files_file: &'static str,
+}
+
 #[derive(Debug)]
 pub struct PolicyError(String);
 
@@ -76,6 +95,17 @@ impl fmt::Display for PolicyError {
 }
 
 impl Error for PolicyError {}
+
+#[derive(Debug)]
+pub struct EvidenceError(String);
+
+impl fmt::Display for EvidenceError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
+impl Error for EvidenceError {}
 
 pub fn load_policy(source: &str) -> Result<Policy, PolicyError> {
     let document: PolicyDocument = serde_yaml::from_str(source)
@@ -156,6 +186,52 @@ pub fn run_deterministic_mock_plan(
         changed_files: Vec::new(),
         plan: plan.to_owned(),
     })
+}
+
+pub fn write_mock_evidence(
+    output_root: &Path,
+    run_id: &str,
+    run: &MockRun,
+) -> Result<EvidenceArtifact, EvidenceError> {
+    if run_id.is_empty()
+        || !run_id.chars().all(|character| {
+            character.is_ascii_alphanumeric() || character == '-' || character == '_'
+        })
+    {
+        return Err(EvidenceError(
+            "invalid evidence run ID: use only ASCII letters, digits, hyphens, and underscores"
+                .to_owned(),
+        ));
+    }
+
+    let directory = output_root.join(format!("cai-run-{run_id}"));
+    fs::create_dir_all(&directory)
+        .map_err(|error| EvidenceError(format!("could not create evidence directory: {error}")))?;
+
+    write_json(
+        &directory.join("manifest.json"),
+        &EvidenceManifest {
+            format_version: 1,
+            run_id,
+            result_file: "result.json",
+            plan_file: "plan.md",
+            changed_files_file: "changed-files.json",
+        },
+    )?;
+    write_json(&directory.join("result.json"), run)?;
+    write_json(&directory.join("changed-files.json"), &run.changed_files)?;
+    fs::write(directory.join("plan.md"), format!("{}\n", run.plan))
+        .map_err(|error| EvidenceError(format!("could not write plan evidence: {error}")))?;
+
+    Ok(EvidenceArtifact { directory })
+}
+
+fn write_json(path: &Path, value: &impl Serialize) -> Result<(), EvidenceError> {
+    let mut content = serde_json::to_vec_pretty(value)
+        .map_err(|error| EvidenceError(format!("could not serialize evidence: {error}")))?;
+    content.push(b'\n');
+    fs::write(path, content)
+        .map_err(|error| EvidenceError(format!("could not write evidence: {error}")))
 }
 
 fn validate_required_value(name: &str, value: &str) -> Result<(), PolicyError> {
