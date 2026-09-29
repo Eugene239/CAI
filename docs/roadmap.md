@@ -3,7 +3,7 @@
 ## Phase 0 — Foundation
 
 - Project charter and architecture accepted.
-- Implementation language and license selected.
+- Rust core and TypeScript GitHub Action wrapper selected.
 - GitHub App permission matrix defined.
 - Threat model and repository policy schema drafted.
 

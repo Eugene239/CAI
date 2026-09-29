@@ -45,10 +45,16 @@ CAI receives an authorized GitHub event, evaluates repository policy, dispatches
 - Provider adapters are replaceable.
 - Documentation, code, issues, and pull requests are written in English.
 
+## Implementation direction
+
+CAI's core harness and CLI will be implemented in Rust. Rust is selected for a portable, resource-efficient, memory-safe executable suitable for GitHub Actions and self-hosted runners. The GitHub Action wrapper will use TypeScript where an action integration requires JavaScript tooling.
+
+This does not make CAI a sandbox runtime: GitHub Actions and the task container remain the MVP execution boundary.
+
 ## Open decisions
 
-- Implementation language and deployment footprint.
-- Durable queue and ledger storage.
+- Deployment footprint.
+- Durable queue and ledger storage beyond the Actions-first MVP.
 - First supported runner implementation.
 - First provider adapters after Claude.
 - Open-source license.
