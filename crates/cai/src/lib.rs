@@ -39,6 +39,31 @@ pub struct ResolvedPolicy {
     pub sha256: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MockScenario {
+    Available,
+    QuotaExhausted,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize)]
+pub struct MockRun {
+    pub outcome: String,
+    pub execution_mode: String,
+    pub provider: String,
+    pub model: String,
+    pub usage: TokenUsage,
+    pub quota_state: String,
+    pub changed_files: Vec<String>,
+    pub plan: String,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize)]
+pub struct TokenUsage {
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+    pub total_tokens: u64,
+}
+
 #[derive(Debug)]
 pub struct PolicyError(String);
 
@@ -84,6 +109,49 @@ impl Policy {
             sha256: self.sha256.clone(),
         })
     }
+}
+
+pub fn run_deterministic_mock_plan(
+    policy: &ResolvedPolicy,
+    scenario: MockScenario,
+) -> Result<MockRun, PolicyError> {
+    if policy.provider != "mock" {
+        return Err(PolicyError(format!(
+            "deterministic mock plan requires provider mock, received {}",
+            policy.provider
+        )));
+    }
+
+    let (outcome, output_tokens, quota_state, plan) = match scenario {
+        MockScenario::Available => (
+            "completed",
+            64,
+            "available",
+            "Deterministic mock plan; no repository changes.",
+        ),
+        MockScenario::QuotaExhausted => (
+            "quota-exhausted",
+            0,
+            "exhausted",
+            "No plan produced because mock quota is exhausted.",
+        ),
+    };
+    let input_tokens = 128;
+
+    Ok(MockRun {
+        outcome: outcome.to_owned(),
+        execution_mode: "plan-only".to_owned(),
+        provider: policy.provider.clone(),
+        model: policy.model.clone(),
+        usage: TokenUsage {
+            input_tokens,
+            output_tokens,
+            total_tokens: input_tokens + output_tokens,
+        },
+        quota_state: quota_state.to_owned(),
+        changed_files: Vec::new(),
+        plan: plan.to_owned(),
+    })
 }
 
 fn validate_required_value(name: &str, value: &str) -> Result<(), PolicyError> {
