@@ -8,17 +8,26 @@ Repository-facing content is written in English. Discussion outside the reposito
 
 ## Current phase
 
-CAI is in the foundation phase. The repository currently contains architecture and product documentation, not production code.
+CAI has an initial Rust policy-resolution CLI. GitHub App onboarding, Actions integration, OIDC exchange, task isolation, provider execution, evidence artifacts, and delivery are not implemented yet.
 
 CAI's core harness and CLI use Rust. A TypeScript wrapper may be added only for GitHub Action integration. Do not introduce additional languages, runtimes, package managers, frameworks, provider SDKs, or infrastructure dependencies without an explicit project decision.
 
 ## Setup commands
 
-No installation, development-server, build, test, or lint command exists yet. Do not invent commands or placeholder toolchains.
+Install the Rust stable toolchain with `rustup`, then run from the repository root:
 
-When implementation begins, document the canonical commands in this section and keep them current.
+```bash
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
+cargo test
+cargo run -p cai -- policy resolve --config /path/to/cai.yaml --repository owner/repository
+```
 
-The initial test baseline is `cargo test` for Rust and `node --test` for the TypeScript Action wrapper. Use npm with a committed `package-lock.json`. Follow RED → GREEN → REFACTOR: every new production behavior needs a test that was observed failing first.
+The command writes exactly one JSON result document to standard output. Diagnostics go to standard error and failure returns a non-zero exit status.
+
+The Action wrapper has not been implemented yet. When it is added, it uses npm with a committed `package-lock.json` and the built-in Node test runner: `node --test`.
+
+The initial test baseline is `cargo test` for Rust and `node --test` for the TypeScript Action wrapper. Follow RED → GREEN → REFACTOR: every new production behavior needs a test that was observed failing first.
 
 ## First local POC
 

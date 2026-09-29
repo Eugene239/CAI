@@ -48,7 +48,7 @@ The initial release does not merge pull requests, deploy software, force-push br
 
 ## Status
 
-Planning and project skeleton. No production code has been added yet.
+The first Rust policy-resolution CLI is implemented and tested. It loads local policy YAML, resolves global and repository provider/model selection, preserves the exact policy snapshot, and emits its SHA-256 hash as one JSON document. The GitHub Action wrapper and all GitHub/App/runtime integrations remain unimplemented.
 
 ## License
 
