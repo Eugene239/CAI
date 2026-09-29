@@ -11,16 +11,17 @@
 
 - GitHub App webhook verification and idempotency.
 - OAuth login and repository onboarding.
+- Docker Compose deployment for CAI and Cloudflare Tunnel ingress.
 - Runner-pool enrollment and health reporting.
 - Durable run ledger and policy decision record.
 - Read-only repository inspection run.
 
-## Phase 2 — First provider and draft PR delivery
+## Phase 2 — First provider and pull-request delivery
 
-- Claude adapter using workload identity federation where available.
+- OAuth adapter contract and deterministic mock usage reporting.
 - Isolated execution contract.
-- Verification evidence collector.
-- Issue or comment to evidence-backed draft pull request.
+- Evidence collector and final GitHub run comment.
+- Issue or comment to evidence-backed ready-for-review pull request.
 - GitHub status and cancellation flow.
 
 ## Phase 3 — Operator surfaces

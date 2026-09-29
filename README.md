@@ -25,8 +25,8 @@ The first release targets this flow:
 GitHub issue, comment, or label
   -> CAI policy decision
   -> isolated self-hosted or GitHub-hosted runner
-  -> agent execution and verification
-  -> evidence-backed draft pull request
+  -> agent execution
+  -> evidence-backed ready-for-review pull request
   -> human review
 ```
 

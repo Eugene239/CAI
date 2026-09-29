@@ -28,19 +28,22 @@ When implementation begins, document the canonical commands in this section and 
 - CAI automatically selects provider and model from policy. Authorized labels may override the selection.
 - The provider-adapter contract is provider-neutral. The first adapter is deterministic and mock-only.
 - The first end-to-end workflow is plan-only: a `cai` label starts a mock run, uploads evidence, and makes no repository changes.
+- A task container runs on the selected GitHub runner, not in the CAI deployment. It receives only a per-run workspace and temporary directory; do not mount host credentials, SSH agents, Docker sockets, home directories, or arbitrary host paths.
+- A task container never receives a GitHub write token. The CAI Action delivers changes outside the container with a fresh App installation token issued through validated GitHub OIDC.
+- CAI creates ready-for-review pull requests, not draft pull requests. It does not wait for, parse, retry, or fix repository-native CI.
 - Network and container resource policy are not standardized in the MVP.
-- A successful write-capable run creates or updates a draft pull request only. It must not merge, deploy, force-push, modify protected branches, or widen permissions.
+- A successful write-capable run creates or updates a ready-for-review pull request only. It must not merge, deploy, force-push, modify protected branches, or widen permissions.
 
 ## Invocation
 
-- CAI starts runs from an approved CAI label or from a comment whose first non-empty line begins with `@cai-agent <instruction>`.
+- CAI starts runs from an approved CAI label or from a comment whose first non-empty line begins with `@cai-agent <instruction>`. The initiator must have GitHub `write`, `maintain`, or `admin` access.
 - Do not treat other mentions as CAI commands.
 
 ## Review
 
 Automated independent review is deferred beyond the MVP. CAI must not publish an automated GitHub review verdict or request review-specific permissions until the GitHub review API and private-repository ruleset behavior have been validated.
 
-Every CAI-created draft pull request requires ordinary human review. CAI never merges pull requests.
+Every CAI-created pull request requires ordinary human review. CAI never merges pull requests.
 
 ## Documentation
 

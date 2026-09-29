@@ -27,6 +27,8 @@ The installer, not CAI, chooses `All repositories` or `Only select repositories`
 
 For a privileged repository operation, CAI generates an App JWT and mints a fresh installation access token. It does not persist an installation token as a repository credential. If a user changes the installation's repository list, CAI must mint a fresh token and re-check scope before a privileged action.
 
+An Actions workflow obtains its installation token through a GitHub OIDC exchange with the CAI deployment. CAI validates the exact connected repository, generated workflow, default-branch reference, GitHub run ID, and installation scope. The task container never receives the token.
+
 ## Authorization order
 
 1. Verify the GitHub webhook and deduplicate the event.
@@ -43,12 +45,12 @@ For a privileged repository operation, CAI generates an App JWT and mints a fres
 A newly connected repository starts with:
 
 - explicit trigger allowlist;
-- read-only planning or draft-PR write mode;
+- read-only planning or ready-for-review pull-request write mode;
 - no merge or deployment capability;
 - no cross-repository access;
 - no persistent workspace;
-- bounded execution time and provider budget;
-- repository-defined verification commands recorded before execution.
+- bounded execution time and provider quota handling;
+- repository-native CI remains independent from CAI delivery.
 
 ## Revocation
 
