@@ -2,49 +2,45 @@
 
 ## Goal
 
-Connect a private GitHub repository to CAI quickly without adding personal access tokens, permanent provider keys, or bespoke workflow files.
+Connect a GitHub repository to CAI without personal access tokens or permanent provider keys. CAI installs one standard workflow through a ready-for-review bootstrap pull request.
 
-## Target CLI flow
-
-```text
-cai repo connect owner/private-repository
-```
-
-The command should:
-
-1. Open the GitHub App installation flow when the repository is not yet authorized.
-2. Confirm that the organization owner selected the repository explicitly.
-3. Discover repository instructions and verification configuration in read-only mode.
-4. Select an approved runner pool.
-5. Create a repository record with the baseline policy.
-6. Confirm the supported GitHub triggers and default delivery mode.
-
-## Target UI flow
+## Installation and bootstrap flow
 
 ```text
-Connect repository
-  -> GitHub repository picker
-  -> runner-pool selection
-  -> policy summary
-  -> connect
+Install CAI GitHub App
+  -> choose All repositories or Only select repositories in GitHub
+  -> explicitly confirm bootstrap for a selected repository
+  -> CAI opens a ready-for-review bootstrap pull request
+  -> owner merges the pull request
+  -> repository can accept CAI runs
 ```
+
+CAI must:
+
+1. Treat every repository selected by the installer as connected, without expanding the installation scope itself.
+2. Require an explicit bootstrap confirmation before writing to a selected repository.
+3. Open a normal, ready-for-review pull request on a dedicated bootstrap branch; never write the workflow directly to the default branch.
+4. Discover repository instructions and verification configuration in read-only mode.
+5. Select `ubuntu-latest` for a public repository and `self-hosted` for a private repository in the initial workflow.
+6. Record the installation, repository visibility, bootstrap pull request, and initial policy.
 
 ## Default behavior
 
-- The repository is private or public according to its existing GitHub visibility.
 - CAI sees only repositories selected in the GitHub App installation.
-- The first runnable mode is issue/comment to plan or draft pull request.
+- The first runnable mode is a `cai` label to a mock plan-only run.
 - No merge, deployment, force-push, protected-branch write, or cross-repository access is enabled.
-- Provider authentication is configured at the CAI workspace or runner-pool level and is never copied into repository secrets.
+- Provider authentication is configured at the CAI deployment or runner level and is never copied into repository secrets.
+- For a private repository, the owner configures an eligible self-hosted runner or runner group in GitHub. CAI never falls back to an operator-owned runner.
 
 ## Preflight record
 
 Onboarding records:
 
-- GitHub owner, repository, installation, and default branch;
+- GitHub owner, repository, installation, visibility, and default branch;
+- bootstrap pull request and pinned CAI Action revision;
 - discovered instructions such as `AGENTS.md`, `CLAUDE.md`, and `CONTRIBUTING.md`;
 - discovered build, lint, and test entry points;
-- allowed runner pool and provider adapters;
+- generated runner selector and provider adapters;
 - initial policy version and onboarding principal.
 
-Preflight discovery does not start an agent run or modify repository content.
+Preflight discovery does not start an agent run. Bootstrap only changes repository content through its explicit pull request.

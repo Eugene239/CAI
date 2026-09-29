@@ -12,13 +12,20 @@ CAI is not a sandbox runtime: GitHub Actions and the task container remain the M
 
 ## Execution model
 
-A GitHub Actions workflow is the execution plane. It may run on GitHub-hosted runners or operator-managed self-hosted runners. The operator chooses the host platform and provisioning method.
+A GitHub Actions workflow in each connected repository is the execution plane. CAI installs the standard workflow through an explicit, ready-for-review bootstrap pull request; it never commits the workflow directly to a default branch.
+
+The bootstrap process chooses the initial runner selector from repository visibility:
+
+- public repository: GitHub-hosted runner;
+- private repository: `self-hosted` runner.
+
+The repository owner controls eligible self-hosted runners and runner groups in GitHub. If no eligible runner is available, GitHub leaves the job queued; CAI does not fall back to an operator-owned runner. A repository owner may later change the standard workflow to a different supported runner selector.
 
 Every task executes in one container with a clean workspace and scoped mounts. A task container has a 60-minute wall-clock limit by default; repository policy may lower that limit. Resource limits and outbound-network policy are not standardized in the MVP.
 
 ```text
-GitHub issue or pull request event
-  -> CAI workflow trigger
+GitHub issue or pull request event in a connected repository
+  -> CAI workflow trigger in that repository
   -> workflow policy resolution
   -> clean task container
   -> provider adapter and agent process
@@ -52,7 +59,7 @@ The first implementation validates this contract with a deterministic mock adapt
 
 ## GitHub outputs and evidence
 
-A run publishes its state through GitHub checks and workflow logs. The workflow uploads one run artifact containing the effective prompt, raw execution logs, structured events, verification output, and result metadata.
+A run publishes its state through the source repository's GitHub Actions checks and workflow logs. The workflow uploads one run artifact to that repository containing the effective prompt, redacted execution logs, structured events, verification output, and result metadata.
 
 Artifacts and workflow logs are retained for seven days by default. Repository policy may reduce retention to one through six days.
 
@@ -73,6 +80,7 @@ A later review design must establish and validate all of the following before it
 
 - Issue text, pull-request text, repository files, diffs, test output, and agent output are untrusted input.
 - A task container may access only its scoped workspace and mounts.
-- Provider credentials must not be committed to repositories or included in artifacts.
+- Provider credentials must not be committed to repositories or included in logs or artifacts.
+- GitHub App installation tokens, `GITHUB_TOKEN`, OAuth access tokens, and private keys must not be passed as command-line arguments, workflow outputs, or artifact content.
 - A reviewer must not write repository contents, push commits, create branches, or merge pull requests.
 - GitHub review identity, task identity, provider identity, and runner identity are separate concepts and must remain traceable in run evidence.

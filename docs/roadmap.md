@@ -4,7 +4,7 @@
 
 - Project charter and architecture accepted.
 - Rust core and TypeScript GitHub Action wrapper selected.
-- GitHub App permission matrix defined.
+- GitHub App permission matrix and ready-for-review workflow bootstrap defined.
 - Threat model and repository policy schema drafted.
 
 ## Phase 1 — GitHub and runner control plane
