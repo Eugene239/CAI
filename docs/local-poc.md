@@ -11,7 +11,11 @@ Docker Compose
 └─ cai-state: named Docker volume containing SQLite state
 ```
 
-SQLite is the only persistent store in the first POC. It records App installations, connected repositories, bootstrap state, run ledger records, and OIDC replay-protection data. There is no PostgreSQL, Redis, or automated backup in the first POC.
+SQLite is the only persistent store in the first POC. SQLite records App installations, connected repositories, bootstrap state, run ledger records, and OIDC replay-protection data. There is no PostgreSQL, Redis, or automated backup in the first POC.
+
+## Current SQLite run ledger
+
+The Rust core opens a SQLite database through `rusqlite` with a bundled SQLite build, so the first POC does not depend on an operating-system SQLite package. The implemented `runs` table persists run ID, repository, outcome, execution mode, provider/model, token counters, quota state, and policy SHA-256. It deliberately does not persist the full policy snapshot or any credential material. Installation, repository, bootstrap, and OIDC replay records are not implemented yet.
 
 ## Secrets
 
