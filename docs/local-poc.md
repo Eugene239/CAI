@@ -53,4 +53,10 @@ plan.md
 changed-files.json
 ```
 
-The manifest records the format version, run ID, and file names. The result includes the resolved policy snapshot and SHA-256. Run IDs are restricted to ASCII letters, digits, hyphens, and underscores so evidence output cannot create nested paths. The future GitHub Action will upload this directory as part of the repository-native run artifact and add redacted prompt, event, and execution-log evidence.
+The manifest records the format version, run ID, and file names. The result includes the resolved policy snapshot and SHA-256. Run IDs are restricted to ASCII letters, digits, hyphens, and underscores so evidence output cannot create nested paths. The current CLI entry point is:
+
+```bash
+cai mock evidence --config /path/to/cai.yaml --repository owner/repository --output-root /path/to/evidence --run-id mock-run-001
+```
+
+It writes evidence only under the supplied output root and reports one JSON document containing the evidence directory plus the plan-only result. The future GitHub Action will upload this directory as part of the repository-native run artifact and add redacted prompt, event, and execution-log evidence.

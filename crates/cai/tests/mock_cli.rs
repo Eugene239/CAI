@@ -111,3 +111,56 @@ fn mock_plan_rejects_a_non_mock_provider() {
     assert!(output.stdout.is_empty());
     assert!(String::from_utf8_lossy(&output.stderr).contains("requires provider mock"));
 }
+
+#[test]
+fn mock_evidence_writes_and_reports_a_plan_only_artifact() {
+    let config_path = std::env::temp_dir().join(format!(
+        "cai-mock-evidence-{}-{}.yaml",
+        std::process::id(),
+        std::thread::current().name().unwrap_or("test")
+    ));
+    let output_root = std::env::temp_dir().join(format!(
+        "cai-mock-evidence-output-{}-{}",
+        std::process::id(),
+        std::thread::current().name().unwrap_or("test")
+    ));
+    fs::write(
+        &config_path,
+        "defaults:\n  provider: mock\n  model: deterministic-v1\n",
+    )
+    .expect("fixture must be written");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_cai"))
+        .args([
+            "mock",
+            "evidence",
+            "--config",
+            config_path.to_str().expect("UTF-8 temp path"),
+            "--repository",
+            "Eugene239/CAI",
+            "--output-root",
+            output_root.to_str().expect("UTF-8 temp path"),
+            "--run-id",
+            "mock-run-002",
+        ])
+        .output()
+        .expect("binary must start");
+
+    fs::remove_file(&config_path).expect("fixture must be removed");
+
+    assert!(output.status.success());
+    assert!(output.stderr.is_empty());
+
+    let value: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("stdout must be one JSON document");
+    let directory = output_root.join("cai-run-mock-run-002");
+    assert_eq!(
+        value["evidence_directory"],
+        directory.to_string_lossy().as_ref()
+    );
+    assert_eq!(value["result"]["execution_mode"], "plan-only");
+    assert!(directory.join("manifest.json").is_file());
+    assert!(directory.join("result.json").is_file());
+
+    fs::remove_dir_all(&output_root).expect("temporary evidence must be removed");
+}
