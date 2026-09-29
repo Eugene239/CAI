@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 
+pub mod server;
+
 use std::{
     collections::HashMap,
     error::Error,

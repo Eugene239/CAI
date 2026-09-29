@@ -27,7 +27,7 @@ POST /v1/actions/token-exchange
 GET  /health
 ```
 
-CAI UI and administrative APIs stay private. The local CAI machine does not need a public listener, public IP address, or inbound port forwarding.
+The initial Axum router implements `GET /health` as a stateless, credential-free JSON response. Webhook and OIDC exchange handlers remain unimplemented. CAI UI and administrative APIs stay private. The local CAI machine does not need a public listener, public IP address, or inbound port forwarding.
 
 ## First vertical proof
 
