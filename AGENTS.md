@@ -29,14 +29,16 @@ When implementation begins, document the canonical commands in this section and 
 - Network and container resource policy are not standardized in the MVP.
 - A successful write-capable run creates or updates a draft pull request only. It must not merge, deploy, force-push, modify protected branches, or widen permissions.
 
-## Invocation and review
+## Invocation
 
 - CAI starts runs from an approved CAI label or from a comment whose first non-empty line begins with `@cai-agent <instruction>`.
 - Do not treat other mentions as CAI commands.
-- Independent review is repository-configurable. Its default trigger is manual; repositories may enable review on every new pull-request revision.
-- The default review output is a GitHub `COMMENT` and `CAI / independent-review` status check.
-- Formal `APPROVE` or `REQUEST_CHANGES` is an explicit repository opt-in.
-- A formal reviewer must use a different provider and a different model from the implementation run, review the exact pull-request head revision, and run read-only.
+
+## Review
+
+Automated independent review is deferred beyond the MVP. CAI must not publish an automated GitHub review verdict or request review-specific permissions until the GitHub review API and private-repository ruleset behavior have been validated.
+
+Every CAI-created draft pull request requires ordinary human review. CAI never merges pull requests.
 
 ## Documentation
 

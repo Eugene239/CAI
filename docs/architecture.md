@@ -58,25 +58,16 @@ Artifacts and workflow logs are retained for seven days by default. Repository p
 
 A write-capable implementation run may create or update a draft pull request. CAI does not merge pull requests, deploy software, force-push branches, modify protected branches, or widen its own permissions.
 
-## Optional independent review
+## Review is deferred beyond the MVP
 
-Independent review is configured per repository and supports two trigger modes:
+The MVP does not run automated independent review, publish GitHub review verdicts, or request permissions for review automation. Every draft pull request remains subject to ordinary human review.
 
-- `manual` — the default; a review command starts the review.
-- `on_pr_update` — review runs for every new pull-request head revision.
+A later review design must establish and validate all of the following before it becomes a merge gate:
 
-The default review result is a GitHub `COMMENT` plus a `CAI / independent-review` status check. A repository may opt into formal `APPROVE` or `REQUEST_CHANGES` behavior.
-
-A formal gate requires a reviewer run that is independent from the implementation run:
-
-```text
-implementation provider != reviewer provider
-implementation model != reviewer model
-implementation run != reviewer run
-reviewer execution mode == read-only
-```
-
-The reviewer evaluates the exact pull-request head revision, the diff, repository review rules, and verification evidence. If a new commit changes the pull request, the previous verdict does not apply to the new revision.
+- an independent GitHub identity;
+- separation of implementation and reviewer provider/model/run;
+- read-only reviewer execution on the exact pull-request head revision;
+- GitHub review API and ruleset behavior for private repositories.
 
 ## Trust boundaries
 
