@@ -73,7 +73,7 @@ Every CAI-created pull request requires ordinary human review. CAI never merges 
 
 ## Pull requests
 
-All changes, including documentation-only changes, require a pull request. Do not push directly to `main`.
+All changes, including documentation-only changes, require a ready-for-review pull request. Do not push directly to `main`. Do not create draft pull requests unless a user explicitly requests one.
 
 Each pull request must state:
 
