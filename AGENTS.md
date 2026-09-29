@@ -18,6 +18,13 @@ No installation, development-server, build, test, or lint command exists yet. Do
 
 When implementation begins, document the canonical commands in this section and keep them current.
 
+## First local POC
+
+- The first deployment is Docker Compose with CAI, `cloudflared`, and SQLite in a named Docker volume.
+- Compose secrets are mounted read-only. Do not use environment variables, command lines, logs, artifacts, or SQLite for credentials.
+- Cloudflare Tunnel exposes only the GitHub webhook, OIDC token exchange, and health endpoints. Keep UI and administrative APIs private.
+- The first vertical proof runs plan-only on `Eugene239/CAI` with the deterministic mock provider. It must not create a code change or pull request.
+
 ## Architecture invariants
 
 - GitHub Actions is the MVP execution plane; do not add a custom worker, queue, or persistent execution service without an accepted architecture change.

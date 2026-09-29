@@ -12,9 +12,17 @@
 - GitHub App webhook verification and idempotency.
 - OAuth login and repository onboarding.
 - Docker Compose deployment for CAI and Cloudflare Tunnel ingress.
+- SQLite state in a named Docker volume; no PostgreSQL, Redis, or automated backup in the first POC.
+- Docker Compose secrets for App and OAuth credentials.
 - Runner-pool enrollment and health reporting.
 - Durable run ledger and policy decision record.
 - Read-only repository inspection run.
+
+## First vertical POC
+
+- Bootstrap `Eugene239/CAI` through the CAI App.
+- Run a plan-only deterministic mock task on a GitHub-hosted runner.
+- Prove OIDC token exchange, final usage comment, and run artifact.
 
 ## Phase 2 — First provider and pull-request delivery
 
