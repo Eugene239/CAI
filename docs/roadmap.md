@@ -6,6 +6,7 @@
 - Rust core and TypeScript GitHub Action wrapper selected.
 - GitHub App permission matrix and ready-for-review workflow bootstrap defined.
 - Threat model and repository policy schema drafted.
+- Apache-2.0 license, Cargo workspace baseline, Action-wrapper contract, and TDD baseline selected.
 
 ## Phase 1 — GitHub and runner control plane
 

@@ -18,6 +18,8 @@ No installation, development-server, build, test, or lint command exists yet. Do
 
 When implementation begins, document the canonical commands in this section and keep them current.
 
+The initial test baseline is `cargo test` for Rust and `node --test` for the TypeScript Action wrapper. Use npm with a committed `package-lock.json`. Follow RED → GREEN → REFACTOR: every new production behavior needs a test that was observed failing first.
+
 ## First local POC
 
 - The first deployment is Docker Compose with CAI, `cloudflared`, and SQLite in a named Docker volume.
