@@ -12,7 +12,7 @@ CAI is not a model provider, an IDE, or a replacement for GitHub. GitHub remains
 - **OAuth and workload identity first:** no personal access tokens or permanent provider keys as the normal operating model.
 - **Private-repository ready:** repositories are explicitly selected through a GitHub App installation.
 - **Isolated execution:** every task runs in an ephemeral, policy-bound environment.
-- **Draft PR by default:** agents may prepare work; humans retain merge and deployment authority.
+- **Ready-for-review PR by default:** agents may prepare work; humans retain merge and deployment authority.
 - **Evidence before claims:** test output, changed files, commit SHA, agent events, and policy decisions are recorded for every run.
 - **Provider-neutral:** Claude, Codex, Cursor, AGY, and future providers are adapters rather than dependencies of the control plane.
 - **Dogfood in the open:** CAI is built and used through its own GitHub workflow.
@@ -38,6 +38,9 @@ The initial release does not merge pull requests, deploy software, force-push br
 - [Architecture](docs/architecture.md)
 - [Identity and access model](docs/identity-and-access.md)
 - [Repository onboarding](docs/repository-onboarding.md)
+- [GitHub App and workflow bootstrap](docs/github-app.md)
+- [Local policy configuration](docs/policy.md)
+- [Local deployment and first POC](docs/local-poc.md)
 - [Roadmap](docs/roadmap.md)
 - [Contribution guide](CONTRIBUTING.md)
 - [Agent instructions](AGENTS.md)
@@ -45,3 +48,7 @@ The initial release does not merge pull requests, deploy software, force-push br
 ## Status
 
 Planning and project skeleton. No production code has been added yet.
+
+## License
+
+CAI is licensed under the [Apache License 2.0](LICENSE). Copyright 2026 CAI contributors.

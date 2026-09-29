@@ -57,4 +57,3 @@ This does not make CAI a sandbox runtime: GitHub Actions and the task container 
 - Durable queue and ledger storage beyond the Actions-first MVP.
 - First supported runner implementation.
 - First provider adapters after Claude.
-- Open-source license.
