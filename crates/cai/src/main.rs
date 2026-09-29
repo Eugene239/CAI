@@ -9,6 +9,19 @@ struct EvidenceOutput<'a> {
 }
 
 #[derive(Serialize)]
+struct LedgerOutput {
+    database: String,
+    run_id: String,
+}
+
+#[derive(Serialize)]
+struct MockRunOutput<'a> {
+    evidence_directory: String,
+    ledger: LedgerOutput,
+    result: &'a cai::MockRun,
+}
+
+#[derive(Serialize)]
 struct ServeOutput {
     listen: String,
 }
@@ -105,6 +118,46 @@ async fn run() -> Result<(), String> {
                 result: &run,
             })
         }
+        [
+            command,
+            operation,
+            flag_config,
+            config_path,
+            flag_repository,
+            repository,
+            flag_output_root,
+            output_root,
+            flag_state_database,
+            state_database,
+            flag_run_id,
+            run_id,
+        ] if command == "mock"
+            && operation == "run"
+            && flag_config == "--config"
+            && flag_repository == "--repository"
+            && flag_output_root == "--output-root"
+            && flag_state_database == "--state-db"
+            && flag_run_id == "--run-id" =>
+        {
+            let resolved = resolve_policy(config_path, repository)?;
+            let run = cai::run_deterministic_mock_plan(&resolved, cai::MockScenario::Available)
+                .map_err(|error| error.to_string())?;
+            let evidence = cai::write_mock_evidence(Path::new(output_root), run_id, &run)
+                .map_err(|error| error.to_string())?;
+            let mut ledger = cai::ledger::RunLedger::open(Path::new(state_database))
+                .map_err(|error| error.to_string())?;
+            ledger
+                .record_mock_run(run_id, repository, &run)
+                .map_err(|error| error.to_string())?;
+            write_json(&MockRunOutput {
+                evidence_directory: evidence.directory.display().to_string(),
+                ledger: LedgerOutput {
+                    database: state_database.to_owned(),
+                    run_id: run_id.to_owned(),
+                },
+                result: &run,
+            })
+        }
         [command, flag_listen, address] if command == "serve" && flag_listen == "--listen" => {
             let address = address
                 .parse::<SocketAddr>()
@@ -144,5 +197,5 @@ fn write_json(value: &impl serde::Serialize) -> Result<(), String> {
 }
 
 fn usage() -> String {
-    "usage: cai policy resolve --config <cai.yaml> --repository <owner/repository>\n       cai mock plan --config <cai.yaml> --repository <owner/repository> [--quota-exhausted]\n       cai mock evidence --config <cai.yaml> --repository <owner/repository> --output-root <directory> --run-id <run-id>\n       cai serve --listen <loopback-address:port>".to_owned()
+    "usage: cai policy resolve --config <cai.yaml> --repository <owner/repository>\n       cai mock plan --config <cai.yaml> --repository <owner/repository> [--quota-exhausted]\n       cai mock evidence --config <cai.yaml> --repository <owner/repository> --output-root <directory> --run-id <run-id>\n       cai mock run --config <cai.yaml> --repository <owner/repository> --output-root <directory> --state-db <database> --run-id <run-id>\n       cai serve --listen <loopback-address:port>".to_owned()
 }

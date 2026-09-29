@@ -69,4 +69,10 @@ The manifest records the format version, run ID, and file names. The result incl
 cai mock evidence --config /path/to/cai.yaml --repository owner/repository --output-root /path/to/evidence --run-id mock-run-001
 ```
 
-It writes evidence only under the supplied output root and reports one JSON document containing the evidence directory plus the plan-only result. The future GitHub Action will upload this directory as part of the repository-native run artifact and add redacted prompt, event, and execution-log evidence.
+It writes evidence only under the supplied output root and reports one JSON document containing the evidence directory plus the plan-only result. The current local vertical command combines the deterministic mock, evidence directory, and durable run ledger:
+
+```bash
+cai mock run --config /path/to/cai.yaml --repository owner/repository --output-root /path/to/evidence --state-db /path/to/cai.sqlite --run-id mock-run-001
+```
+
+It makes no GitHub or repository writes. The future GitHub Action will upload the evidence directory as part of the repository-native run artifact and add redacted prompt, event, and execution-log evidence.
