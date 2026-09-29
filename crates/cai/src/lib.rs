@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+pub mod ledger;
 pub mod server;
 
 use std::{
