@@ -10,7 +10,7 @@ Coding agents can edit code, run tests, and open pull requests, but teams need a
 
 ## Product statement
 
-CAI receives an authorized GitHub event, evaluates repository policy, dispatches an approved agent into an isolated runner, captures the run ledger, and returns a reviewable draft pull request with evidence.
+CAI receives an authorized GitHub event, evaluates repository policy, dispatches an approved agent into an isolated runner, captures the run ledger, and returns a ready-for-review pull request with evidence.
 
 ## Users
 
@@ -32,7 +32,7 @@ CAI receives an authorized GitHub event, evaluates repository policy, dispatches
 1. A private repository can be connected through a GitHub App installation in minutes.
 2. An authorized issue or pull-request comment can create an isolated agent run.
 3. Every run has an immutable ledger containing its initiator, policy decision, repository revision, provider, runner, execution events, evidence, and final outcome.
-4. A successful write-capable run produces a draft pull request only.
+4. A successful write-capable run produces a ready-for-review pull request only.
 5. Repository policy can deny a run before any workspace or provider access is created.
 6. A self-hosted runner can be enrolled, health-checked, and restricted to named repository pools.
 

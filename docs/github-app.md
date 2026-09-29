@@ -16,9 +16,9 @@ The installer chooses `All repositories` or `Only select repositories` in GitHub
 | Contents | Write | Create the bootstrap branch and commit the standard workflow. |
 | Workflows | Write | Add or update the workflow under `.github/workflows/`. |
 | Pull requests | Write | Open the normal, ready-for-review bootstrap pull request. |
-| Issues | Write | Post bootstrap progress when needed. |
+| Issues | Write | Post bootstrap and final run comments. |
 
-The MVP does not request Actions, Checks, Administration, or review-specific permissions. GitHub Actions creates its own workflow status and check output.
+The MVP does not request Actions, Checks, Administration, or review-specific permissions. Users cancel runs through the native GitHub Actions UI. GitHub Actions creates its own workflow status and check output.
 
 ## Bootstrap contract
 
@@ -40,3 +40,11 @@ The repository owner controls runner groups and eligible self-hosted runners in 
 The CAI deployment stores the GitHub App private key and webhook secret outside repositories, workflow files, and run artifacts. For each privileged operation, it generates an App JWT and mints a fresh installation access token scoped to the installation.
 
 Installation tokens, `GITHUB_TOKEN`, OAuth access tokens, provider credentials, and private keys must be redacted from logs and excluded from artifacts. They must not be passed through command-line arguments or workflow outputs.
+
+## Actions OIDC exchange
+
+The generated workflow does not receive a stored App private key or a repository secret containing an installation token. It requests a GitHub OIDC token and sends it to the CAI deployment's token-exchange endpoint.
+
+CAI validates the token's repository, generated workflow, default-branch reference, GitHub run ID, and current App installation scope before minting a fresh installation token for that run. The task container never receives that token; only the delivery layer outside the container may use it.
+
+CAI exposes its GitHub webhook endpoint and OIDC token-exchange endpoint through one Cloudflare Tunnel. A public health endpoint is permitted. All UI and administrative APIs remain private.
