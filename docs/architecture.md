@@ -10,6 +10,10 @@ The core harness and `cai` CLI are Rust binaries. Rust provides a portable, reso
 
 CAI is not a sandbox runtime: GitHub Actions and the task container remain the MVP execution boundary. The Rust core orchestrates policy enforcement, provider adapters, process lifecycle, evidence collection, and GitHub-facing outputs.
 
+## Local deployment state
+
+The first CAI deployment is Docker Compose with a local SQLite database in a named Docker volume. SQLite records installations, connected repositories, bootstrap state, run ledger records, and OIDC replay-protection data. The first POC has no PostgreSQL, Redis, or automated backup.
+
 ## Execution model
 
 A GitHub Actions workflow in each connected repository is the execution plane. CAI installs the standard workflow through an explicit, ready-for-review bootstrap pull request; it never commits the workflow directly to a default branch.
