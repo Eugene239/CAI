@@ -48,7 +48,7 @@ The initial release does not merge pull requests, deploy software, force-push br
 
 ## Status
 
-The first Rust policy-resolution CLI is implemented and tested. It loads local policy YAML, resolves global and repository provider/model selection, preserves the exact policy snapshot, and emits its SHA-256 hash as one JSON document. The GitHub Action wrapper and all GitHub/App/runtime integrations remain unimplemented.
+The first Rust policy-resolution and deterministic mock-plan CLI is implemented and tested. It loads local policy YAML, resolves global and repository provider/model selection, preserves the exact policy snapshot, emits its SHA-256 hash, and executes a plan-only mock result with deterministic usage/quota reporting. The GitHub Action wrapper and all GitHub/App/runtime integrations remain unimplemented.
 
 ## License
 
