@@ -27,7 +27,13 @@ POST /v1/actions/token-exchange
 GET  /health
 ```
 
-The initial Axum router implements `GET /health` as a stateless, credential-free JSON response. Its listener factory accepts loopback addresses only and rejects public bind addresses before opening a socket. Webhook and OIDC exchange handlers remain unimplemented. CAI UI and administrative APIs stay private. The local CAI machine does not need a public listener, public IP address, or inbound port forwarding.
+The initial Axum router implements `GET /health` as a stateless, credential-free JSON response. Its listener factory accepts loopback addresses only and rejects public bind addresses before opening a socket. The local server starts with:
+
+```bash
+cai serve --listen 127.0.0.1:8080
+```
+
+It writes one JSON document with the bound listener address, then serves until stopped. Webhook and OIDC exchange handlers remain unimplemented. CAI UI and administrative APIs stay private. The local CAI machine does not need a public listener, public IP address, or inbound port forwarding.
 
 ## First vertical proof
 

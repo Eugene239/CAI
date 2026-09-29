@@ -1,4 +1,4 @@
-use std::{env, fs, io, path::Path, process};
+use std::{env, fs, io, net::SocketAddr, path::Path, process};
 
 use serde::Serialize;
 
@@ -8,14 +8,20 @@ struct EvidenceOutput<'a> {
     result: &'a cai::MockRun,
 }
 
-fn main() {
-    if let Err(error) = run() {
+#[derive(Serialize)]
+struct ServeOutput {
+    listen: String,
+}
+
+#[tokio::main]
+async fn main() {
+    if let Err(error) = run().await {
         eprintln!("cai: {error}");
         process::exit(1);
     }
 }
 
-fn run() -> Result<(), String> {
+async fn run() -> Result<(), String> {
     let arguments: Vec<String> = env::args().skip(1).collect();
 
     match arguments.as_slice() {
@@ -99,6 +105,23 @@ fn run() -> Result<(), String> {
                 result: &run,
             })
         }
+        [command, flag_listen, address] if command == "serve" && flag_listen == "--listen" => {
+            let address = address
+                .parse::<SocketAddr>()
+                .map_err(|error| format!("invalid CAI listener address {address:?}: {error}"))?;
+            let listener = cai::server::bind_loopback(address)
+                .await
+                .map_err(|error| error.to_string())?;
+            let listen = listener
+                .local_addr()
+                .map_err(|error| format!("could not inspect CAI listener address: {error}"))?;
+            write_json(&ServeOutput {
+                listen: listen.to_string(),
+            })?;
+            cai::server::serve(listener)
+                .await
+                .map_err(|error| error.to_string())
+        }
         _ => Err(usage()),
     }
 }
@@ -121,5 +144,5 @@ fn write_json(value: &impl serde::Serialize) -> Result<(), String> {
 }
 
 fn usage() -> String {
-    "usage: cai policy resolve --config <cai.yaml> --repository <owner/repository>\n       cai mock plan --config <cai.yaml> --repository <owner/repository> [--quota-exhausted]\n       cai mock evidence --config <cai.yaml> --repository <owner/repository> --output-root <directory> --run-id <run-id>".to_owned()
+    "usage: cai policy resolve --config <cai.yaml> --repository <owner/repository>\n       cai mock plan --config <cai.yaml> --repository <owner/repository> [--quota-exhausted]\n       cai mock evidence --config <cai.yaml> --repository <owner/repository> --output-root <directory> --run-id <run-id>\n       cai serve --listen <loopback-address:port>".to_owned()
 }
