@@ -1,13 +1,11 @@
 #[test]
 fn deterministic_mock_plan_reports_fixed_usage_without_repository_changes() {
-    let policy = cai::load_policy(
-        r#"
+    let source = r#"
 defaults:
   provider: mock
   model: deterministic-v1
-"#,
-    )
-    .expect("policy must parse");
+"#;
+    let policy = cai::load_policy(source).expect("policy must parse");
     let resolved = policy
         .resolve("Eugene239/CAI")
         .expect("policy must resolve");
@@ -19,6 +17,8 @@ defaults:
     assert_eq!(run.execution_mode, "plan-only");
     assert_eq!(run.provider, "mock");
     assert_eq!(run.model, "deterministic-v1");
+    assert_eq!(run.policy_snapshot, source);
+    assert_eq!(run.policy_sha256, resolved.sha256);
     assert_eq!(run.usage.input_tokens, 128);
     assert_eq!(run.usage.output_tokens, 64);
     assert_eq!(run.usage.total_tokens, 192);

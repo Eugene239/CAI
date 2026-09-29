@@ -51,6 +51,8 @@ pub struct MockRun {
     pub execution_mode: String,
     pub provider: String,
     pub model: String,
+    pub policy_snapshot: String,
+    pub policy_sha256: String,
     pub usage: TokenUsage,
     pub quota_state: String,
     pub changed_files: Vec<String>,
@@ -143,6 +145,8 @@ pub fn run_deterministic_mock_plan(
         execution_mode: "plan-only".to_owned(),
         provider: policy.provider.clone(),
         model: policy.model.clone(),
+        policy_snapshot: policy.snapshot.clone(),
+        policy_sha256: policy.sha256.clone(),
         usage: TokenUsage {
             input_tokens,
             output_tokens,
