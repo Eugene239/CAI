@@ -38,6 +38,7 @@
 
 ## Explicitly deferred
 
+- Automated independent review and use of the GitHub review API as a merge gate.
 - Autonomous merge and deployment.
 - General-purpose hosted IDE.
 - Broad multi-repository agent permissions.
