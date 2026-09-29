@@ -1,4 +1,12 @@
-use std::{env, fs, io, process};
+use std::{env, fs, io, path::Path, process};
+
+use serde::Serialize;
+
+#[derive(Serialize)]
+struct EvidenceOutput<'a> {
+    evidence_directory: String,
+    result: &'a cai::MockRun,
+}
 
 fn main() {
     if let Err(error) = run() {
@@ -63,6 +71,34 @@ fn run() -> Result<(), String> {
                     .map_err(|error| error.to_string())?;
             write_json(&run)
         }
+        [
+            command,
+            operation,
+            flag_config,
+            config_path,
+            flag_repository,
+            repository,
+            flag_output_root,
+            output_root,
+            flag_run_id,
+            run_id,
+        ] if command == "mock"
+            && operation == "evidence"
+            && flag_config == "--config"
+            && flag_repository == "--repository"
+            && flag_output_root == "--output-root"
+            && flag_run_id == "--run-id" =>
+        {
+            let resolved = resolve_policy(config_path, repository)?;
+            let run = cai::run_deterministic_mock_plan(&resolved, cai::MockScenario::Available)
+                .map_err(|error| error.to_string())?;
+            let evidence = cai::write_mock_evidence(Path::new(output_root), run_id, &run)
+                .map_err(|error| error.to_string())?;
+            write_json(&EvidenceOutput {
+                evidence_directory: evidence.directory.display().to_string(),
+                result: &run,
+            })
+        }
         _ => Err(usage()),
     }
 }
@@ -85,5 +121,5 @@ fn write_json(value: &impl serde::Serialize) -> Result<(), String> {
 }
 
 fn usage() -> String {
-    "usage: cai policy resolve --config <cai.yaml> --repository <owner/repository>\n       cai mock plan --config <cai.yaml> --repository <owner/repository> [--quota-exhausted]".to_owned()
+    "usage: cai policy resolve --config <cai.yaml> --repository <owner/repository>\n       cai mock plan --config <cai.yaml> --repository <owner/repository> [--quota-exhausted]\n       cai mock evidence --config <cai.yaml> --repository <owner/repository> --output-root <directory> --run-id <run-id>".to_owned()
 }
