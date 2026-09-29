@@ -27,7 +27,11 @@ The Rust binary writes exactly one JSON result document to standard output. Diag
 
 ## First TDD slice
 
-The first behavior loads and validates local `cai.yaml`, resolves a repository default provider and model, and emits the exact policy hash and snapshot for a deterministic mock run.
+The first behavior loads and validates local `cai.yaml`, resolves a repository default provider and model, and emits the exact policy hash and snapshot for a deterministic mock run. It is available through:
+
+```bash
+cargo run -p cai -- policy resolve --config /path/to/cai.yaml --repository owner/repository
+```
 
 Repository overrides use canonical `owner/repository` identifiers. The first schema ignores unknown fields for forward compatibility. Invalid YAML or missing required resolved values fail the run explicitly.
 
