@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc --project tsconfig.json",
-    "test": "node --test test/**/*.test.js"
+    "test": "node --test test"
   },
   "devDependencies": {
     "@types/node": "22.10.2",
