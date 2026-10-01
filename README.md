@@ -41,6 +41,7 @@ The initial release does not merge pull requests, deploy software, force-push br
 - [GitHub App and workflow bootstrap](docs/github-app.md)
 - [Local policy configuration](docs/policy.md)
 - [Local deployment and first POC](docs/local-poc.md)
+- [Release distribution](docs/release-distribution.md)
 - [Implementation baseline](docs/implementation-baseline.md)
 - [Roadmap](docs/roadmap.md)
 - [Contribution guide](CONTRIBUTING.md)
