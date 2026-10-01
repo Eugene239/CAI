@@ -1,4 +1,4 @@
-name: Rust CI
+name: CI
 
 on:
   push:
@@ -9,8 +9,8 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    name: Format, lint, and test
+  rust:
+    name: Rust format, lint, and test
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -27,3 +27,32 @@ jobs:
 
       - name: Test
         run: cargo +stable test --locked
+
+  action:
+    name: Action wrapper build and test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: actions/cai
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Node
+        uses: actions/setup-node@1e60f620b9541d11c42d76b803e68dc9d6b8b5a7 # v4.0.3
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: actions/cai/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build wrapper
+        run: npm run build
+
+      - name: Require checked-in action bundle
+        run: git diff --exit-code -- dist
+
+      - name: Test wrapper
+        run: npm test
