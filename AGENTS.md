@@ -8,7 +8,7 @@ Repository-facing content is written in English. Discussion outside the reposito
 
 ## Current phase
 
-CAI has an initial Rust policy-resolution CLI. GitHub App onboarding, Actions integration, OIDC exchange, task isolation, provider execution, evidence artifacts, and delivery are not implemented yet.
+CAI has an initial Rust policy-resolution and deterministic mock-run CLI plus a thin TypeScript GitHub Action wrapper. The wrapper accepts an immutable Linux x86_64 binary URL and published SHA-256 checksum, then invokes the plan-only mock run and maps its one-document JSON result to Action outputs. GitHub App onboarding, workflow invocation, OIDC exchange, task isolation, real provider execution, artifact upload, comments, and delivery are not implemented yet.
 
 CAI's core harness and CLI use Rust. A TypeScript wrapper may be added only for GitHub Action integration. Do not introduce additional languages, runtimes, package managers, frameworks, provider SDKs, or infrastructure dependencies without an explicit project decision.
 
