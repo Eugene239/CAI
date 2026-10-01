@@ -39,6 +39,6 @@ Repository overrides use canonical `owner/repository` identifiers. The first sch
 
 ## GitHub Action distribution
 
-The thin TypeScript Action wrapper downloads a platform-specific Rust binary from an immutable GitHub Release asset and verifies its published SHA-256 checksum.
+The thin TypeScript Action wrapper downloads the Linux x86_64 Rust binary from an immutable URL and verifies its published SHA-256 checksum before execution. It invokes `cai mock run` with explicit policy, repository, evidence-root, SQLite-ledger, and run-ID inputs; then it validates the one-document JSON result and publishes the plan-only outcome, provider/model, evidence directory, and run ID as Action outputs.
 
-The Action commit pinned by bootstrap contains the exact binary release URL and checksum. The generated `cai.yml` does not accept an arbitrary runtime binary-version input and the wrapper never fetches a moving latest release.
+The Action commit pinned by bootstrap contains the exact binary release URL and checksum. The generated `cai.yml` does not accept an arbitrary runtime binary-version input and the wrapper never fetches a moving latest release. The wrapper receives no GitHub App, OAuth/OIDC, provider, or repository-write credential in this first slice.
