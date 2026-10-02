@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { once } from "node:events";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { extractReleaseArchive, parseMockRunOutput } from "../dist/index.js";
+import { downloadReleaseArchive, extractReleaseArchive, parseMockRunOutput } from "../dist/index.js";
 
 test("parses the one-document result from a completed plan-only mock run", () => {
   const result = parseMockRunOutput(
@@ -60,5 +62,29 @@ test("extracts only the CAI binary from a release archive", async () => {
     assert.equal(readFileSync(binary, "utf8"), "deterministic test binary");
   } finally {
     rmSync(temporaryRoot, { force: true, recursive: true });
+  }
+});
+
+test("follows a release-asset redirect before reading the archive", async () => {
+  const server = createServer((request, response) => {
+    if (request.url === "/release") {
+      response.writeHead(302, { location: "/asset" });
+      response.end();
+      return;
+    }
+    response.writeHead(200, { "content-type": "application/octet-stream" });
+    response.end("release archive bytes");
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  assert.notEqual(typeof address, "string");
+
+  try {
+    const archive = await downloadReleaseArchive(`http://127.0.0.1:${address.port}/release`);
+    assert.equal(archive.toString("utf8"), "release archive bytes");
+  } finally {
+    server.close();
+    await once(server, "close");
   }
 });
