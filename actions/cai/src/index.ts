@@ -51,7 +51,7 @@ export async function runAction(): Promise<void> {
   const workspace = await mkdtemp(join(tmpdir(), "cai-action-"));
 
   try {
-    const archive = await download(inputs.binaryUrl);
+    const archive = await downloadReleaseArchive(inputs.binaryUrl);
     verifyChecksum(archive, inputs.binarySha256);
     const binaryPath = await extractReleaseArchive(archive, workspace);
 
@@ -100,8 +100,8 @@ function input(name: string): string {
   return value;
 }
 
-async function download(url: string): Promise<Buffer> {
-  const response = await fetch(url, { redirect: "error" });
+export async function downloadReleaseArchive(url: string): Promise<Buffer> {
+  const response = await fetch(url, { redirect: "follow" });
   if (!response.ok) {
     throw new Error(`could not download CAI binary: HTTP ${response.status}`);
   }
