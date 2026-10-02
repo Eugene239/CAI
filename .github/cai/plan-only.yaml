@@ -1,0 +1,3 @@
+defaults:
+  provider: mock
+  model: deterministic-v1
