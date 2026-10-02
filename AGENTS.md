@@ -25,7 +25,7 @@ cargo run -p cai -- policy resolve --config /path/to/cai.yaml --repository owner
 
 The command writes exactly one JSON result document to standard output. Diagnostics go to standard error and failure returns a non-zero exit status.
 
-The Action wrapper has not been implemented yet. When it is added, it uses npm with a committed `package-lock.json` and the built-in Node test runner: `node --test`.
+The Action wrapper is implemented under `actions/cai`. It uses npm with a committed `package-lock.json` and the built-in Node test runner: `node --test`.
 
 The initial test baseline is `cargo test` for Rust and `node --test` for the TypeScript Action wrapper. Follow RED → GREEN → REFACTOR: every new production behavior needs a test that was observed failing first.
 
