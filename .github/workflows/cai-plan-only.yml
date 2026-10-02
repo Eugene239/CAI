@@ -1,0 +1,50 @@
+name: CAI plan-only proof
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mock-plan:
+    name: Run deterministic plan-only mock
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Run pinned CAI release
+        id: cai
+        uses: ./actions/cai
+        with:
+          binary-url: https://github.com/Eugene239/CAI/releases/download/v0.1.0/cai-x86_64-unknown-linux-gnu.tar.gz
+          binary-sha256: 82bb27f37b583f4500fbc581cb5b89614de517c1165e527d6b4911984983d3fb
+          config: .github/cai/plan-only.yaml
+          repository: Eugene239/CAI
+          output-root: ${{ runner.temp }}/cai-evidence
+          state-db: ${{ runner.temp }}/cai-state.sqlite
+          run-id: github-${{ github.run_id }}
+
+      - name: Assert plan-only result
+        env:
+          OUTCOME: ${{ steps.cai.outputs.outcome }}
+          EXECUTION_MODE: ${{ steps.cai.outputs.execution-mode }}
+          PROVIDER: ${{ steps.cai.outputs.provider }}
+          EVIDENCE_DIRECTORY: ${{ steps.cai.outputs.evidence-directory }}
+        run: |
+          test "$OUTCOME" = completed
+          test "$EXECUTION_MODE" = plan-only
+          test "$PROVIDER" = mock
+          test -f "$EVIDENCE_DIRECTORY/manifest.json"
+          test -f "$EVIDENCE_DIRECTORY/result.json"
+          test -f "$EVIDENCE_DIRECTORY/plan.md"
+          test -f "$EVIDENCE_DIRECTORY/changed-files.json"
+
+      - name: Upload plan-only evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cai-plan-only-${{ github.run_id }}
+          path: ${{ steps.cai.outputs.evidence-directory }}
+          if-no-files-found: error
+          retention-days: 7
