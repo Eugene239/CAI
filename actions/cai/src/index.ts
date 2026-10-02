@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { appendFile, chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { appendFile, chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
@@ -49,28 +49,30 @@ export function parseMockRunOutput(stdout: string): MockRunOutput {
 export async function runAction(): Promise<void> {
   const inputs = readInputs();
   const workspace = await mkdtemp(join(tmpdir(), "cai-action-"));
-  const binaryPath = join(workspace, "cai");
 
   try {
     const archive = await download(inputs.binaryUrl);
     verifyChecksum(archive, inputs.binarySha256);
-    await writeFile(binaryPath, archive, { mode: 0o700 });
-    await chmod(binaryPath, 0o700);
+    const binaryPath = await extractReleaseArchive(archive, workspace);
 
-    const { stdout } = await execute(binaryPath, [
-      "mock",
-      "run",
-      "--config",
-      inputs.config,
-      "--repository",
-      inputs.repository,
-      "--output-root",
-      inputs.outputRoot,
-      "--state-db",
-      inputs.stateDatabase,
-      "--run-id",
-      inputs.runId,
-    ]);
+    const { stdout } = await execute(
+      binaryPath,
+      [
+        "mock",
+        "run",
+        "--config",
+        inputs.config,
+        "--repository",
+        inputs.repository,
+        "--output-root",
+        inputs.outputRoot,
+        "--state-db",
+        inputs.stateDatabase,
+        "--run-id",
+        inputs.runId,
+      ],
+      "cai mock run",
+    );
     const output = parseMockRunOutput(stdout);
     await publishOutputs(output);
   } finally {
@@ -116,7 +118,24 @@ function verifyChecksum(content: Buffer, expected: string): void {
   }
 }
 
-async function execute(command: string, args: string[]): Promise<{ stdout: string }> {
+export async function extractReleaseArchive(archive: Buffer, destination: string): Promise<string> {
+  await mkdir(destination, { recursive: true });
+  const archivePath = join(destination, "cai-release.tar.gz");
+  await writeFile(archivePath, archive, { mode: 0o600 });
+
+  const { stdout } = await execute("tar", ["-tzf", archivePath], "inspect CAI release archive");
+  const entries = stdout.trim().split("\n").filter(Boolean);
+  if (entries.length !== 1 || entries[0] !== "cai") {
+    throw new Error("CAI release archive must contain exactly one cai binary");
+  }
+
+  await execute("tar", ["-xzf", archivePath, "-C", destination], "extract CAI release archive");
+  const binaryPath = join(destination, "cai");
+  await chmod(binaryPath, 0o700);
+  return binaryPath;
+}
+
+async function execute(command: string, args: string[], description: string): Promise<{ stdout: string }> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
@@ -128,7 +147,7 @@ async function execute(command: string, args: string[]): Promise<{ stdout: strin
     child.on("error", reject);
     child.on("close", (code) => {
       if (code !== 0) {
-        reject(new Error(`cai mock run failed with exit code ${code}: ${stderr.trim()}`));
+        reject(new Error(`${description} failed with exit code ${code}: ${stderr.trim()}`));
         return;
       }
       resolve({ stdout });
