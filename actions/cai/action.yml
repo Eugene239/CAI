@@ -1,0 +1,40 @@
+name: CAI
+description: Run the immutable CAI binary for a deterministic plan-only mock task.
+inputs:
+  binary-url:
+    description: Exact immutable URL of the CAI Linux x86_64 release asset.
+    required: true
+  binary-sha256:
+    description: SHA-256 checksum published alongside the exact release asset.
+    required: true
+  config:
+    description: Path to the repository policy file.
+    required: true
+  repository:
+    description: Canonical owner/repository identifier.
+    required: true
+  output-root:
+    description: Writable directory for the plan-only evidence directory.
+    required: true
+  state-db:
+    description: Writable path for the local SQLite run ledger.
+    required: true
+  run-id:
+    description: CAI run identifier.
+    required: true
+outputs:
+  outcome:
+    description: CAI mock-run outcome.
+  execution-mode:
+    description: CAI execution mode.
+  provider:
+    description: Resolved provider.
+  model:
+    description: Resolved model.
+  evidence-directory:
+    description: Evidence directory created by CAI.
+  run-id:
+    description: Recorded CAI run identifier.
+runs:
+  using: node20
+  main: dist/index.js
