@@ -268,7 +268,10 @@ fn run_executor_mock(inputs: ExecutorMockInputs<'_>) -> Result<(), String> {
     .map_err(|error| error.to_string())?;
 
     let task_directory = Path::new(inputs.task_directory);
-    let result = (|| -> Result<(), String> {
+    let result_output = Path::new(inputs.result_output);
+    cai::executor::validate_result_output_path(task_directory, result_output)
+        .map_err(|error| error.to_string())?;
+    let result = (|| -> Result<Vec<u8>, String> {
         cai::executor::materialize_session_files(task_directory, &payload.session_files)
             .map_err(|error| error.to_string())?;
         let encrypted_result = cai::envelope::seal_result(
@@ -282,10 +285,8 @@ fn run_executor_mock(inputs: ExecutorMockInputs<'_>) -> Result<(), String> {
             &executor_signing_key,
         )
         .map_err(|error| error.to_string())?;
-        let result_bytes = serde_json::to_vec(&encrypted_result)
-            .map_err(|error| format!("could not serialize encrypted executor result: {error}"))?;
-        fs::write(inputs.result_output, result_bytes)
-            .map_err(|error| format!("could not write encrypted executor result: {error}"))
+        serde_json::to_vec(&encrypted_result)
+            .map_err(|error| format!("could not serialize encrypted executor result: {error}"))
     })();
     let cleanup = if task_directory.exists() {
         fs::remove_dir_all(task_directory)
@@ -293,8 +294,10 @@ fn run_executor_mock(inputs: ExecutorMockInputs<'_>) -> Result<(), String> {
     } else {
         Ok(())
     };
-    result?;
+    let result_bytes = result?;
     cleanup?;
+    fs::write(result_output, result_bytes)
+        .map_err(|error| format!("could not write encrypted executor result: {error}"))?;
 
     write_json(&ExecutorOutput {
         task_id: payload.task_id,

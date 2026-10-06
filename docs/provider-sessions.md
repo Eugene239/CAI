@@ -30,7 +30,7 @@ Every CAI owner is an independent tenant with separate:
 - executor-fleet encryption key and key version;
 - trusted GitHub runner group and repository installation scope.
 
-A task envelope includes the tenant and executor-key identifiers, an expiry, a one-time task identifier, the allowed repository, and the expected workflow identity. An executor rejects an envelope whose signature, tenant, key identifier, expiry, or workflow binding is invalid. An executor pool from another tenant cannot decrypt or accept it.
+The target protocol includes tenant and executor-key identifiers, an expiry, a one-time task identifier, the allowed repository, and the expected workflow identity. The future executor service rejects an envelope whose signature, tenant, key identifier, expiry, repository, or workflow binding is invalid. The current local primitive integrity-protects tenant, repository, and workflow fields, but accepts only an expected tenant and has no executor-key registry or independent repository/workflow authorization yet. An executor pool from another tenant cannot decrypt an envelope encrypted to this tenant's fleet key.
 
 A shared physical machine is out of scope for the first implementation. A machine that serves more than one tenant must use separately isolated executor profiles and keys.
 

@@ -4,7 +4,10 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use cai::{envelope::SessionFile, executor::materialize_session_files};
+use cai::{
+    envelope::SessionFile,
+    executor::{materialize_session_files, validate_result_output_path},
+};
 
 fn temporary_directory(name: &str) -> PathBuf {
     let unique = SystemTime::now()
@@ -31,6 +34,32 @@ fn materializes_only_named_session_files_in_the_task_directory() {
     fs::remove_dir_all(task_directory).expect("remove task directory");
 }
 
+#[cfg(unix)]
+#[test]
+fn creates_a_private_task_directory() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let task_directory = temporary_directory("executor-private-directory");
+    materialize_session_files(
+        &task_directory,
+        &[SessionFile {
+            name: "mock-auth.json".to_owned(),
+            contents: "fake-session-only".to_owned(),
+        }],
+    )
+    .expect("materialize session files");
+
+    assert_eq!(
+        fs::metadata(&task_directory)
+            .expect("task directory metadata")
+            .permissions()
+            .mode()
+            & 0o777,
+        0o700
+    );
+    fs::remove_dir_all(task_directory).expect("remove task directory");
+}
+
 #[test]
 fn rejects_a_preexisting_task_directory() {
     let task_directory = temporary_directory("executor-existing");
@@ -45,6 +74,15 @@ fn rejects_a_preexisting_task_directory() {
 
     assert!(error.to_string().contains("create task session directory"));
     fs::remove_dir_all(task_directory).expect("remove task directory");
+}
+
+#[test]
+fn rejects_a_result_path_inside_the_task_directory() {
+    let task_directory = temporary_directory("executor-output");
+    let error = validate_result_output_path(&task_directory, &task_directory.join("result.json"))
+        .expect_err("result output inside task directory must be rejected");
+
+    assert!(error.to_string().contains("outside the task directory"));
 }
 
 #[test]

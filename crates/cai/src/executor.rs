@@ -17,6 +17,19 @@ impl fmt::Display for ExecutorError {
 
 impl Error for ExecutorError {}
 
+pub fn validate_result_output_path(
+    task_directory: &Path,
+    result_output: &Path,
+) -> Result<(), ExecutorError> {
+    if result_output.starts_with(task_directory) {
+        return Err(ExecutorError(
+            "executor result output must be outside the task directory".to_owned(),
+        ));
+    }
+
+    Ok(())
+}
+
 pub fn materialize_session_files(
     task_directory: &Path,
     session_files: &[SessionFile],
@@ -29,7 +42,18 @@ pub fn materialize_session_files(
         }
     }
 
-    fs::create_dir(task_directory).map_err(|error| {
+    #[cfg(unix)]
+    let directory_creation = {
+        use std::os::unix::fs::DirBuilderExt;
+
+        let mut builder = fs::DirBuilder::new();
+        builder.mode(0o700);
+        builder.create(task_directory)
+    };
+    #[cfg(not(unix))]
+    let directory_creation = fs::create_dir(task_directory);
+
+    directory_creation.map_err(|error| {
         ExecutorError(format!("could not create task session directory: {error}"))
     })?;
     for session_file in session_files {
