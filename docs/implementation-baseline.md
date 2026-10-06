@@ -47,7 +47,7 @@ For the deterministic round-trip proof, the mock executor echoes the prompt reco
 
 ## Gemini CLI adapter prototype
 
-The Rust core also has a deliberately narrow local Gemini CLI wrapper for validating the native headless command contract. `cai provider gemini ping --binary <gemini-cli> --workspace <directory>` invokes the supplied executable directly, without a shell, as `gemini --prompt CAI_PING --output-format json --approval-mode plan`. It requires the structured JSON response to be exactly `CAI_PONG`; malformed JSON fails closed. Native exit code `42` is normalized as invalid input and `53` as a turn-limit failure; other non-zero exits are provider failures.
+The Rust core also has a deliberately narrow local Gemini CLI wrapper for validating the native headless command contract. `cai provider gemini ping --binary <gemini-cli> --workspace <directory>` invokes the supplied executable directly, without a shell, as `gemini --prompt CAI_PING --output-format json --approval-mode plan`. It requires the structured JSON response to be exactly `CAI_PONG`; malformed JSON fails closed. Native exit code `42` is normalized as invalid input and `53` as a turn-limit failure. On any non-zero exit, a valid JSON `error.code` of `429` is normalized as `rate-limited` and preserves `provider_status: 429`; other failures remain `provider-failure`.
 
 This is a tested ping-only adapter boundary, not real provider execution: it does not materialize credentials, accept encrypted task envelopes, run arbitrary prompts, preserve sessions, or participate in GitHub workflows. A real Gemini task adapter must add those capabilities only after the executor service and its credential boundary are implemented.
 

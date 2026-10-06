@@ -36,6 +36,7 @@ pub enum GeminiOutcome {
     Completed,
     InvalidRequest,
     TurnLimitExceeded,
+    RateLimited,
     ProviderFailure,
 }
 
@@ -45,6 +46,7 @@ pub struct GeminiRun {
     pub response: Option<String>,
     pub stats: Value,
     pub exit_code: i32,
+    pub provider_status: Option<u16>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -93,11 +95,14 @@ impl GeminiCli {
         let exit_code = output.status.code().unwrap_or(-1);
 
         if !output.status.success() {
+            let provider_status = structured_provider_status(&output.stdout)
+                .or_else(|| structured_provider_status(&output.stderr));
             return Ok(GeminiRun {
-                outcome: classify_exit(exit_code),
+                outcome: classify_exit(exit_code, provider_status),
                 response: None,
                 stats: Value::Null,
                 exit_code,
+                provider_status,
             });
         }
 
@@ -119,14 +124,24 @@ impl GeminiCli {
             response: Some(response.response),
             stats: response.stats,
             exit_code,
+            provider_status: None,
         })
     }
 }
 
-fn classify_exit(exit_code: i32) -> GeminiOutcome {
-    match exit_code {
-        42 => GeminiOutcome::InvalidRequest,
-        53 => GeminiOutcome::TurnLimitExceeded,
+fn classify_exit(exit_code: i32, provider_status: Option<u16>) -> GeminiOutcome {
+    match (exit_code, provider_status) {
+        (_, Some(429)) => GeminiOutcome::RateLimited,
+        (42, _) => GeminiOutcome::InvalidRequest,
+        (53, _) => GeminiOutcome::TurnLimitExceeded,
         _ => GeminiOutcome::ProviderFailure,
     }
+}
+
+fn structured_provider_status(source: &[u8]) -> Option<u16> {
+    let output: Value = serde_json::from_slice(source).ok()?;
+    output
+        .pointer("/error/code")
+        .and_then(Value::as_u64)
+        .and_then(|code| u16::try_from(code).ok())
 }

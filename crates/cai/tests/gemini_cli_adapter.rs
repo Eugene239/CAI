@@ -107,6 +107,26 @@ fn gemini_headless_input_error_is_classified_without_parsing_a_result() {
 }
 
 #[test]
+fn gemini_headless_rate_limit_is_returned_as_http_429() {
+    let binary = fixture(
+        "rate-limit",
+        "printf '%s\\n' '{\"error\":{\"code\":429,\"status\":\"RESOURCE_EXHAUSTED\"}}'; exit 1",
+    );
+
+    let run = GeminiCli::new(&binary)
+        .run(&GeminiRequest {
+            prompt: "CAI_PING".to_owned(),
+            working_directory: std::env::temp_dir(),
+        })
+        .expect("a structured rate-limit response is a normalized run");
+
+    assert_eq!(run.outcome, GeminiOutcome::RateLimited);
+    assert_eq!(run.provider_status, Some(429));
+    assert_eq!(run.response, None);
+    let _ = fs::remove_file(binary);
+}
+
+#[test]
 fn gemini_headless_success_with_invalid_json_fails_closed() {
     let binary = fixture("invalid-json", "printf '%s\\n' 'not-json'");
 
