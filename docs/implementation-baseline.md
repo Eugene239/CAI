@@ -37,6 +37,12 @@ cargo run -p cai -- mock plan --config /path/to/cai.yaml --repository owner/repo
 
 Repository overrides use canonical `owner/repository` identifiers. The first schema ignores unknown fields for forward compatibility. Invalid YAML or missing required resolved values fail the run explicitly.
 
+## Encrypted executor primitive
+
+The Rust core implements the transport primitive for a future trusted self-hosted executor pool. A CAI host signs a versioned task envelope with Ed25519 and encrypts its payload to the tenant executor-fleet X25519 public key using ChaCha20-Poly1305. The executor verifies the signature, tenant, and expiry before it decrypts or materializes a session file. The current replay guard is in-memory and process-local; durable replay protection remains future work.
+
+The deterministic executor CLI test path creates a new Unix mode-`0700` task directory, materializes only validated session-file names, keeps ownership of only that newly created directory for cleanup, writes an Ed25519-signed encrypted result for the CAI host only after cleanup succeeds, and removes the task directory before it exits. A pre-existing task directory is rejected and never deleted. Its caller must provide an executor-controlled tmpfs parent; the primitive does not itself verify the filesystem type. It is not a provider adapter and does not accept real provider credentials. GitHub dispatch delivery and a dedicated self-hosted executor service remain future work.
+
 ## GitHub Action distribution
 
 The thin TypeScript Action wrapper downloads the Linux x86_64 Rust binary from an immutable URL and verifies its published SHA-256 checksum before execution. It invokes `cai mock run` with explicit policy, repository, evidence-root, SQLite-ledger, and run-ID inputs; then it validates the one-document JSON result and publishes the plan-only outcome, provider/model, evidence directory, and run ID as Action outputs.

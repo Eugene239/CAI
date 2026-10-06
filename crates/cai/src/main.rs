@@ -1,6 +1,8 @@
 use std::{env, fs, io, net::SocketAddr, path::Path, process};
 
+use ed25519_dalek::{SigningKey, VerifyingKey};
 use serde::Serialize;
+use x25519_dalek::StaticSecret;
 
 #[derive(Serialize)]
 struct EvidenceOutput<'a> {
@@ -24,6 +26,24 @@ struct MockRunOutput<'a> {
 #[derive(Serialize)]
 struct ServeOutput {
     listen: String,
+}
+
+#[derive(Serialize)]
+struct ExecutorOutput {
+    task_id: String,
+    outcome: String,
+    result_output: String,
+}
+
+struct ExecutorMockInputs<'a> {
+    envelope_path: &'a str,
+    fleet_secret_path: &'a str,
+    host_verify_key_path: &'a str,
+    executor_signing_key_path: &'a str,
+    tenant_id: &'a str,
+    now: &'a str,
+    task_directory: &'a str,
+    result_output: &'a str,
 }
 
 #[tokio::main]
@@ -158,6 +178,47 @@ async fn run() -> Result<(), String> {
                 result: &run,
             })
         }
+        [
+            command,
+            operation,
+            flag_envelope,
+            envelope_path,
+            flag_fleet_secret,
+            fleet_secret_path,
+            flag_host_verify_key,
+            host_verify_key_path,
+            flag_executor_signing_key,
+            executor_signing_key_path,
+            flag_tenant,
+            tenant_id,
+            flag_now,
+            now,
+            flag_task_directory,
+            task_directory,
+            flag_result_output,
+            result_output,
+        ] if command == "executor"
+            && operation == "mock"
+            && flag_envelope == "--envelope"
+            && flag_fleet_secret == "--fleet-secret"
+            && flag_host_verify_key == "--host-verify-key"
+            && flag_executor_signing_key == "--executor-signing-key"
+            && flag_tenant == "--tenant"
+            && flag_now == "--now"
+            && flag_task_directory == "--task-directory"
+            && flag_result_output == "--result-output" =>
+        {
+            run_executor_mock(ExecutorMockInputs {
+                envelope_path,
+                fleet_secret_path,
+                host_verify_key_path,
+                executor_signing_key_path,
+                tenant_id,
+                now,
+                task_directory,
+                result_output,
+            })
+        }
         [command, flag_listen, address] if command == "serve" && flag_listen == "--listen" => {
             let address = address
                 .parse::<SocketAddr>()
@@ -179,6 +240,92 @@ async fn run() -> Result<(), String> {
     }
 }
 
+fn run_executor_mock(inputs: ExecutorMockInputs<'_>) -> Result<(), String> {
+    let envelope: cai::envelope::EncryptedTaskEnvelope =
+        read_json(inputs.envelope_path, "task envelope")?;
+    let fleet_secret = StaticSecret::from(read_hex_key(inputs.fleet_secret_path, "fleet secret")?);
+    let host_verify_key = VerifyingKey::from_bytes(&read_hex_key(
+        inputs.host_verify_key_path,
+        "host verification key",
+    )?)
+    .map_err(|error| format!("invalid host verification key: {error}"))?;
+    let executor_signing_key = SigningKey::from_bytes(&read_hex_key(
+        inputs.executor_signing_key_path,
+        "executor signing key",
+    )?);
+    let now = inputs
+        .now
+        .parse::<u64>()
+        .map_err(|error| format!("invalid executor clock value {:?}: {error}", inputs.now))?;
+    let payload = cai::envelope::open_task(
+        &envelope,
+        &fleet_secret,
+        &host_verify_key,
+        inputs.tenant_id,
+        now,
+        &mut cai::envelope::ReplayGuard::default(),
+    )
+    .map_err(|error| error.to_string())?;
+
+    let task_directory = Path::new(inputs.task_directory);
+    let result_output = Path::new(inputs.result_output);
+    cai::executor::validate_result_output_path(task_directory, result_output)
+        .map_err(|error| error.to_string())?;
+    let materialized_task =
+        cai::executor::materialize_session_files(task_directory, &payload.session_files)
+            .map_err(|error| error.to_string())?;
+    let result = (|| -> Result<Vec<u8>, String> {
+        let encrypted_result = cai::envelope::seal_result(
+            &cai::envelope::TaskResult {
+                tenant_id: payload.tenant_id.clone(),
+                task_id: payload.task_id.clone(),
+                outcome: "completed".to_owned(),
+                output: "Deterministic executor mock completed.".to_owned(),
+            },
+            &payload.result_public_key,
+            &executor_signing_key,
+        )
+        .map_err(|error| error.to_string())?;
+        serde_json::to_vec(&encrypted_result)
+            .map_err(|error| format!("could not serialize encrypted executor result: {error}"))
+    })();
+    let cleanup = materialized_task
+        .remove()
+        .map_err(|error| error.to_string());
+    let result_bytes = result?;
+    cleanup?;
+    fs::write(result_output, result_bytes)
+        .map_err(|error| format!("could not write encrypted executor result: {error}"))?;
+
+    write_json(&ExecutorOutput {
+        task_id: payload.task_id,
+        outcome: "completed".to_owned(),
+        result_output: inputs.result_output.to_owned(),
+    })
+}
+
+fn read_json<T: serde::de::DeserializeOwned>(path: &str, name: &str) -> Result<T, String> {
+    let source =
+        fs::read(path).map_err(|error| format!("could not read {name} {path:?}: {error}"))?;
+    serde_json::from_slice(&source).map_err(|error| format!("invalid {name} {path:?}: {error}"))
+}
+
+fn read_hex_key(path: &str, name: &str) -> Result<[u8; 32], String> {
+    let source = fs::read_to_string(path)
+        .map_err(|error| format!("could not read {name} {path:?}: {error}"))?;
+    let source = source.trim();
+    if source.len() != 64 {
+        return Err(format!("{name} must be 64 hexadecimal characters"));
+    }
+
+    let mut key = [0_u8; 32];
+    for (index, output) in key.iter_mut().enumerate() {
+        *output = u8::from_str_radix(&source[index * 2..index * 2 + 2], 16)
+            .map_err(|_| format!("{name} must be lowercase or uppercase hexadecimal"))?;
+    }
+    Ok(key)
+}
+
 fn resolve_policy(config_path: &str, repository: &str) -> Result<cai::ResolvedPolicy, String> {
     let source = fs::read_to_string(config_path)
         .map_err(|error| format!("could not read policy config {config_path:?}: {error}"))?;
@@ -197,5 +344,5 @@ fn write_json(value: &impl serde::Serialize) -> Result<(), String> {
 }
 
 fn usage() -> String {
-    "usage: cai policy resolve --config <cai.yaml> --repository <owner/repository>\n       cai mock plan --config <cai.yaml> --repository <owner/repository> [--quota-exhausted]\n       cai mock evidence --config <cai.yaml> --repository <owner/repository> --output-root <directory> --run-id <run-id>\n       cai mock run --config <cai.yaml> --repository <owner/repository> --output-root <directory> --state-db <database> --run-id <run-id>\n       cai serve --listen <loopback-address:port>".to_owned()
+    "usage: cai policy resolve --config <cai.yaml> --repository <owner/repository>\n       cai mock plan --config <cai.yaml> --repository <owner/repository> [--quota-exhausted]\n       cai mock evidence --config <cai.yaml> --repository <owner/repository> --output-root <directory> --run-id <run-id>\n       cai mock run --config <cai.yaml> --repository <owner/repository> --output-root <directory> --state-db <database> --run-id <run-id>\n       cai executor mock --envelope <task.json> --fleet-secret <hex-file> --host-verify-key <hex-file> --executor-signing-key <hex-file> --tenant <tenant-id> --now <unix-seconds> --task-directory <tmpfs-directory> --result-output <result.json>\n       cai serve --listen <loopback-address:port>".to_owned()
 }
