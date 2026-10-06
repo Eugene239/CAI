@@ -40,6 +40,7 @@ The initial release does not merge pull requests, deploy software, force-push br
 - [Repository onboarding](docs/repository-onboarding.md)
 - [GitHub App and workflow bootstrap](docs/github-app.md)
 - [Local policy configuration](docs/policy.md)
+- [Provider sessions and executor pools](docs/provider-sessions.md)
 - [Local deployment and first POC](docs/local-poc.md)
 - [Release distribution](docs/release-distribution.md)
 - [Implementation baseline](docs/implementation-baseline.md)
@@ -49,7 +50,7 @@ The initial release does not merge pull requests, deploy software, force-push br
 
 ## Status
 
-The first Rust policy-resolution and deterministic mock-run CLI is implemented and tested. It loads local policy YAML, resolves global and repository provider/model selection, preserves the exact policy snapshot, emits its SHA-256 hash, and writes deterministic plan-only evidence plus a SQLite run-ledger record. The first thin TypeScript GitHub Action wrapper downloads an immutable Linux x86_64 binary URL, verifies its SHA-256 checksum, invokes that same plan-only mock run, and exposes its result as Action outputs. GitHub App, OAuth/OIDC exchange, workflow invocation, artifacts, comments, and delivery integrations remain unimplemented.
+The deterministic `mock` provider proof is implemented: a Rust policy-resolution and mock-run CLI, immutable released binary, thin TypeScript Action wrapper, manual plan-only workflow, and authorized `cai` label trigger produce retained evidence without repository writes. Real provider execution is not implemented. The accepted plan uses host-held subscription sessions, round-robin slot selection, and signed encrypted task envelopes delivered through GitHub Actions to a tenant's trusted executor pool; see [Provider sessions and executor pools](docs/provider-sessions.md).
 
 ## License
 

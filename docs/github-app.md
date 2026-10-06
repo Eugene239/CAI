@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The CAI GitHub App connects repositories, receives GitHub events, mints short-lived installation credentials, and opens an explicit bootstrap pull request. It is publicly installable, but it never expands its own installation scope or commits directly to a repository's default branch.
+The CAI GitHub App connects repositories, receives GitHub events, mints short-lived installation credentials, and opens an explicit bootstrap pull request. It is publicly installable, but it never expands its own installation scope or commits directly to a repository's default branch. It is a GitHub integration identity, not a provider-session vault or executor credential.
 
 ## Installation scope
 
@@ -35,9 +35,14 @@ The workflow becomes active only after a human merges that pull request.
 
 The repository owner controls runner groups and eligible self-hosted runners in GitHub. If no runner matches the generated selector, the workflow remains queued. CAI must not redirect that job to an operator-owned runner.
 
-## Credentials
+## Integration modes and credentials
 
-The CAI deployment stores the GitHub App private key and webhook secret outside repositories, workflow files, and run artifacts. For each privileged operation, it generates an App JWT and mints a fresh installation access token scoped to the installation.
+CAI supports two planned integration modes:
+
+- In **self-hosted integration**, the owner creates and installs a GitHub App for their CAI host. The host retains that App's private key and mints its own installation tokens.
+- In **managed integration**, a shared CAI App maps an installation to a tenant and relays opaque encrypted task dispatches. The shared integration service does not receive provider sessions, executor private keys, or plaintext task contents.
+
+In either mode, the GitHub App private key and webhook secret stay outside repositories, workflow files, and run artifacts. For each privileged operation, the App generates a JWT and mints a fresh installation access token scoped to the installation.
 
 Installation tokens, `GITHUB_TOKEN`, OAuth access tokens, provider credentials, and private keys must be redacted from logs and excluded from artifacts. They must not be passed through command-line arguments or workflow outputs.
 
@@ -47,4 +52,4 @@ The generated workflow does not receive a stored App private key or a repository
 
 CAI validates the token's repository, generated workflow, default-branch reference, GitHub run ID, and current App installation scope before minting a fresh installation token for that run. The task container never receives that token; only the delivery layer outside the container may use it.
 
-CAI exposes its GitHub webhook endpoint and OIDC token-exchange endpoint through one Cloudflare Tunnel. A public health endpoint is permitted. All UI and administrative APIs remain private.
+GitHub App installation and GitHub OAuth sign-in are distinct. Installation grants repository access; OAuth sign-in links a human account for management. Neither flow transfers provider OAuth sessions to GitHub.

@@ -12,14 +12,14 @@ CAI does not maintain a separate audit history of policy edits until a managemen
 
 A repository policy defines:
 
-- default provider and model;
+- round-robin provider-session selection and approved models;
 - allowed `cai:provider:*` and `cai:model:*` label overrides;
 - enabled execution mode;
 - task time limit and other local execution constraints.
 
-New repositories may create ready-for-review pull requests immediately. CAI does not set a monetary spend budget: provider access is OAuth-based. Every completed or failed run records the resolved provider, model, input tokens, output tokens, total tokens, and quota outcome.
+Without a `cai:provider:*` or `cai:model:*` label, CAI selects the next healthy subscription slot from the repository's round-robin ring before it dispatches the task. A healthy slot is present, enabled, not leased, not quota-cooled, and not marked `auth-dead` or `unknown`. The selection, lease, resolved provider, resolved model, and non-sensitive skipped-slot reasons are recorded in evidence.
 
-CAI never silently falls back to another provider or model. If a provider reports a quota or rate limit, CAI stops the run and records the error. A human may start a new run with an explicit allowed override.
+An authorized provider or model label wins over round-robin selection. CAI never silently substitutes another provider or model: an unavailable explicit override fails before dispatch, and a quota, rate-limit, or authentication failure after execution begins ends the run. A subscription quota failure does not create a pay-as-you-go fallback or charge path. Every completed or failed run records the resolved provider, model, input tokens, output tokens, total tokens, and quota outcome.
 
 CAI does not add its own secret scan before pull-request delivery in the MVP. Repository-native secret scanning remains responsible for that protection.
 
