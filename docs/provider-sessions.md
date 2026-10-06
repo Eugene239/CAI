@@ -2,7 +2,7 @@
 
 ## Status
 
-This is an accepted architecture plan. It is not implemented. The current vertical proof remains the deterministic `mock` provider and does not materialize provider credentials.
+This is an accepted architecture plan. The encrypted envelope, encrypted result, and deterministic executor CLI primitives are implemented and tested locally; the current replay guard is in-memory and scoped to one executor process. GitHub `repository_dispatch` delivery, durable replay protection, a self-hosted executor workflow proof, session leasing, and real provider credentials are not implemented. The current GitHub vertical proof remains the deterministic `mock` provider and does not materialize provider credentials.
 
 ## Decision
 

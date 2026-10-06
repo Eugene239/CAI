@@ -8,7 +8,7 @@ Repository-facing content is written in English. Discussion outside the reposito
 
 ## Current phase
 
-CAI has a Rust policy-resolution and deterministic mock-run CLI plus a thin TypeScript GitHub Action wrapper. The wrapper accepts an immutable Linux x86_64 binary URL and published SHA-256 checksum, then invokes the plan-only mock run and maps its one-document JSON result to Action outputs. Manual and authorized-label workflows upload retained plan-only evidence. GitHub App onboarding, real provider execution, encrypted executor task envelopes, and delivery remain unimplemented.
+CAI has a Rust policy-resolution and deterministic mock-run CLI plus a thin TypeScript GitHub Action wrapper. The wrapper accepts an immutable Linux x86_64 binary URL and published SHA-256 checksum, then invokes the plan-only mock run and maps its one-document JSON result to Action outputs. Manual and authorized-label workflows upload retained plan-only evidence. The Rust core also has locally tested signed encrypted task/result envelope and deterministic executor primitives. GitHub App onboarding, GitHub-dispatched self-hosted executor proof, real provider execution, and delivery remain unimplemented.
 
 CAI's core harness and CLI use Rust. A TypeScript wrapper may be added only for GitHub Action integration. Do not introduce additional languages, runtimes, package managers, frameworks, provider SDKs, or infrastructure dependencies without an explicit project decision.
 
