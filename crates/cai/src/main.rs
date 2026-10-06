@@ -271,9 +271,10 @@ fn run_executor_mock(inputs: ExecutorMockInputs<'_>) -> Result<(), String> {
     let result_output = Path::new(inputs.result_output);
     cai::executor::validate_result_output_path(task_directory, result_output)
         .map_err(|error| error.to_string())?;
-    let result = (|| -> Result<Vec<u8>, String> {
+    let materialized_task =
         cai::executor::materialize_session_files(task_directory, &payload.session_files)
             .map_err(|error| error.to_string())?;
+    let result = (|| -> Result<Vec<u8>, String> {
         let encrypted_result = cai::envelope::seal_result(
             &cai::envelope::TaskResult {
                 tenant_id: payload.tenant_id.clone(),
@@ -288,12 +289,9 @@ fn run_executor_mock(inputs: ExecutorMockInputs<'_>) -> Result<(), String> {
         serde_json::to_vec(&encrypted_result)
             .map_err(|error| format!("could not serialize encrypted executor result: {error}"))
     })();
-    let cleanup = if task_directory.exists() {
-        fs::remove_dir_all(task_directory)
-            .map_err(|error| format!("could not remove executor task directory: {error}"))
-    } else {
-        Ok(())
-    };
+    let cleanup = materialized_task
+        .remove()
+        .map_err(|error| error.to_string());
     let result_bytes = result?;
     cleanup?;
     fs::write(result_output, result_bytes)

@@ -1,7 +1,7 @@
 use std::{
     error::Error,
     fmt, fs,
-    path::{Component, Path},
+    path::{Component, Path, PathBuf},
 };
 
 use crate::envelope::SessionFile;
@@ -16,6 +16,19 @@ impl fmt::Display for ExecutorError {
 }
 
 impl Error for ExecutorError {}
+
+#[derive(Debug)]
+pub struct MaterializedTaskDirectory {
+    path: PathBuf,
+}
+
+impl MaterializedTaskDirectory {
+    pub fn remove(self) -> Result<(), ExecutorError> {
+        fs::remove_dir_all(&self.path).map_err(|error| {
+            ExecutorError(format!("could not remove executor task directory: {error}"))
+        })
+    }
+}
 
 pub fn validate_result_output_path(
     task_directory: &Path,
@@ -33,7 +46,7 @@ pub fn validate_result_output_path(
 pub fn materialize_session_files(
     task_directory: &Path,
     session_files: &[SessionFile],
-) -> Result<(), ExecutorError> {
+) -> Result<MaterializedTaskDirectory, ExecutorError> {
     for session_file in session_files {
         if !is_single_file_name(&session_file.name) {
             return Err(ExecutorError(
@@ -57,16 +70,20 @@ pub fn materialize_session_files(
         ExecutorError(format!("could not create task session directory: {error}"))
     })?;
     for session_file in session_files {
-        fs::write(
+        if let Err(error) = fs::write(
             task_directory.join(&session_file.name),
             &session_file.contents,
-        )
-        .map_err(|error| {
-            ExecutorError(format!("could not materialize task session file: {error}"))
-        })?;
+        ) {
+            let _ = fs::remove_dir_all(task_directory);
+            return Err(ExecutorError(format!(
+                "could not materialize task session file: {error}"
+            )));
+        }
     }
 
-    Ok(())
+    Ok(MaterializedTaskDirectory {
+        path: task_directory.to_path_buf(),
+    })
 }
 
 fn is_single_file_name(name: &str) -> bool {

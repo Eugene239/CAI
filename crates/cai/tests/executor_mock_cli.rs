@@ -2,6 +2,7 @@ use std::{
     fs,
     path::PathBuf,
     process::Command,
+    sync::atomic::{AtomicU64, Ordering},
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -9,20 +10,37 @@ use cai::envelope::{SessionFile, TaskPayload, open_result, seal_task};
 use ed25519_dalek::SigningKey;
 use x25519_dalek::{PublicKey, StaticSecret};
 
+static NEXT_TEMPORARY_ROOT: AtomicU64 = AtomicU64::new(0);
+
+struct Fixture {
+    root: PathBuf,
+    envelope_path: PathBuf,
+    fleet_secret_path: PathBuf,
+    host_verify_path: PathBuf,
+    executor_signing_path: PathBuf,
+    task_directory: PathBuf,
+    result_path: PathBuf,
+    host_result_secret: StaticSecret,
+    executor_signing_key: SigningKey,
+}
+
 fn temporary_root() -> PathBuf {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("clock after epoch")
         .as_nanos();
-    std::env::temp_dir().join(format!("cai-executor-cli-{}-{nanos}", std::process::id()))
+    let sequence = NEXT_TEMPORARY_ROOT.fetch_add(1, Ordering::Relaxed);
+    std::env::temp_dir().join(format!(
+        "cai-executor-cli-{}-{nanos}-{sequence}",
+        std::process::id()
+    ))
 }
 
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
-#[test]
-fn executor_cli_materializes_a_mock_session_and_returns_an_encrypted_result() {
+fn fixture() -> Fixture {
     let root = temporary_root();
     fs::create_dir_all(&root).expect("temporary root");
     let host_signing_key = SigningKey::from_bytes(&[7; 32]);
@@ -69,18 +87,39 @@ fn executor_cli_materializes_a_mock_session_and_returns_an_encrypted_result() {
     )
     .expect("executor signing");
 
-    let output = Command::new(env!("CARGO_BIN_EXE_cai"))
+    Fixture {
+        root,
+        envelope_path,
+        fleet_secret_path,
+        host_verify_path,
+        executor_signing_path,
+        task_directory,
+        result_path,
+        host_result_secret,
+        executor_signing_key,
+    }
+}
+
+fn run_executor(fixture: &Fixture) -> std::process::Output {
+    Command::new(env!("CARGO_BIN_EXE_cai"))
         .args([
             "executor",
             "mock",
             "--envelope",
-            envelope_path.to_str().expect("UTF-8 envelope"),
+            fixture.envelope_path.to_str().expect("UTF-8 envelope"),
             "--fleet-secret",
-            fleet_secret_path.to_str().expect("UTF-8 fleet secret"),
+            fixture
+                .fleet_secret_path
+                .to_str()
+                .expect("UTF-8 fleet secret"),
             "--host-verify-key",
-            host_verify_path.to_str().expect("UTF-8 host verify"),
+            fixture
+                .host_verify_path
+                .to_str()
+                .expect("UTF-8 host verify"),
             "--executor-signing-key",
-            executor_signing_path
+            fixture
+                .executor_signing_path
                 .to_str()
                 .expect("UTF-8 executor signing"),
             "--tenant",
@@ -88,25 +127,39 @@ fn executor_cli_materializes_a_mock_session_and_returns_an_encrypted_result() {
             "--now",
             "999",
             "--task-directory",
-            task_directory.to_str().expect("UTF-8 task directory"),
+            fixture
+                .task_directory
+                .to_str()
+                .expect("UTF-8 task directory"),
             "--result-output",
-            result_path.to_str().expect("UTF-8 result output"),
+            fixture.result_path.to_str().expect("UTF-8 result output"),
         ])
         .output()
-        .expect("executor binary starts");
+        .expect("executor binary starts")
+}
 
-    assert!(output.status.success());
+#[test]
+fn executor_cli_materializes_a_mock_session_and_returns_an_encrypted_result() {
+    let fixture = fixture();
+    let output = run_executor(&fixture);
+
+    assert!(
+        output.status.success(),
+        "executor stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     assert!(output.stderr.is_empty());
     assert!(
-        !task_directory.exists(),
+        !fixture.task_directory.exists(),
         "executor must remove session tmpfs"
     );
-    let encrypted_result = serde_json::from_slice(&fs::read(&result_path).expect("result written"))
-        .expect("encrypted result JSON");
+    let encrypted_result =
+        serde_json::from_slice(&fs::read(&fixture.result_path).expect("result written"))
+            .expect("encrypted result JSON");
     let result = open_result(
         &encrypted_result,
-        &host_result_secret,
-        &executor_signing_key.verifying_key(),
+        &fixture.host_result_secret,
+        &fixture.executor_signing_key.verifying_key(),
         "tenant-a",
         "task-001",
     )
@@ -114,5 +167,24 @@ fn executor_cli_materializes_a_mock_session_and_returns_an_encrypted_result() {
     assert_eq!(result.outcome, "completed");
     assert_eq!(result.output, "Deterministic executor mock completed.");
 
-    fs::remove_dir_all(root).expect("remove temporary root");
+    fs::remove_dir_all(fixture.root).expect("remove temporary root");
+}
+
+#[test]
+fn executor_cli_does_not_delete_a_preexisting_task_directory() {
+    let fixture = fixture();
+    fs::create_dir_all(&fixture.task_directory).expect("preexisting task directory");
+    let sentinel = fixture.task_directory.join("sentinel.txt");
+    fs::write(&sentinel, "do not delete").expect("write sentinel");
+
+    let output = run_executor(&fixture);
+
+    assert!(!output.status.success());
+    assert!(sentinel.is_file(), "preexisting task content must remain");
+    assert!(
+        !fixture.result_path.exists(),
+        "failed task must not publish result"
+    );
+
+    fs::remove_dir_all(fixture.root).expect("remove temporary root");
 }
