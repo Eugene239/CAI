@@ -1,8 +1,10 @@
 use std::{
     error::Error,
-    fmt,
+    fmt, fs,
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, Stdio},
+    thread,
+    time::{Duration, Instant},
 };
 
 use serde::{Deserialize, Serialize};
@@ -36,6 +38,7 @@ pub enum GeminiOutcome {
     Completed,
     InvalidRequest,
     TurnLimitExceeded,
+    TimedOut,
     RateLimited,
     ProviderFailure,
 }
@@ -65,10 +68,33 @@ impl GeminiCli {
     }
 
     pub fn run(&self, request: &GeminiRequest) -> Result<GeminiRun, ProviderError> {
+        self.run_with_timeout(request, Duration::from_secs(15))
+    }
+
+    pub fn run_with_timeout(
+        &self,
+        request: &GeminiRequest,
+        timeout: Duration,
+    ) -> Result<GeminiRun, ProviderError> {
+        if timeout.is_zero() {
+            return Err(ProviderError("Gemini timeout must be positive".to_owned()));
+        }
         if request.prompt.trim().is_empty() {
             return Err(ProviderError("Gemini prompt must not be empty".to_owned()));
         }
-        if !request.working_directory.is_dir() {
+        let workspace_metadata =
+            fs::symlink_metadata(&request.working_directory).map_err(|error| {
+                ProviderError(format!(
+                    "could not inspect Gemini working directory {}: {error}",
+                    request.working_directory.display()
+                ))
+            })?;
+        if workspace_metadata.file_type().is_symlink() {
+            return Err(ProviderError(
+                "Gemini working directory must not be a symbolic link".to_owned(),
+            ));
+        }
+        if !workspace_metadata.is_dir() {
             return Err(ProviderError(format!(
                 "Gemini working directory is not a directory: {}",
                 request.working_directory.display()
@@ -77,7 +103,7 @@ impl GeminiCli {
 
         // Gemini CLI's official headless contract is `--prompt` plus JSON output.
         // Do not invoke through a shell: prompt text remains one argument.
-        let output = Command::new(&self.binary)
+        let mut child = Command::new(&self.binary)
             .arg("--prompt")
             .arg(&request.prompt)
             .arg("--output-format")
@@ -85,13 +111,39 @@ impl GeminiCli {
             .arg("--approval-mode")
             .arg("plan")
             .current_dir(&request.working_directory)
-            .output()
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
             .map_err(|error| {
                 ProviderError(format!(
                     "could not start Gemini CLI {}: {error}",
                     self.binary.display()
                 ))
             })?;
+        let started_at = Instant::now();
+        let output = loop {
+            if child
+                .try_wait()
+                .map_err(|error| ProviderError(format!("could not wait for Gemini CLI: {error}")))?
+                .is_some()
+            {
+                break child.wait_with_output().map_err(|error| {
+                    ProviderError(format!("could not collect Gemini CLI output: {error}"))
+                })?;
+            }
+            if started_at.elapsed() >= timeout {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Ok(GeminiRun {
+                    outcome: GeminiOutcome::TimedOut,
+                    response: None,
+                    stats: Value::Null,
+                    exit_code: -1,
+                    provider_status: None,
+                });
+            }
+            thread::sleep(Duration::from_millis(10));
+        };
         let exit_code = output.status.code().unwrap_or(-1);
 
         if !output.status.success() {
