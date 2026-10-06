@@ -3,6 +3,7 @@
 pub mod envelope;
 pub mod executor;
 pub mod ledger;
+pub mod providers;
 pub mod server;
 
 use std::{

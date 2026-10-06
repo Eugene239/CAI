@@ -219,6 +219,34 @@ async fn run() -> Result<(), String> {
                 result_output,
             })
         }
+        [
+            command,
+            provider,
+            operation,
+            flag_binary,
+            binary,
+            flag_workspace,
+            workspace,
+        ] if command == "provider"
+            && provider == "gemini"
+            && operation == "ping"
+            && flag_binary == "--binary"
+            && flag_workspace == "--workspace" =>
+        {
+            let run = cai::providers::GeminiCli::new(binary)
+                .run(&cai::providers::GeminiRequest {
+                    prompt: "CAI_PING".to_owned(),
+                    working_directory: Path::new(workspace).to_path_buf(),
+                })
+                .map_err(|error| error.to_string())?;
+            if run.outcome != cai::providers::GeminiOutcome::Completed {
+                return Err(format!("Gemini ping did not complete: {:?}", run.outcome));
+            }
+            if run.response.as_deref() != Some("CAI_PONG") {
+                return Err("Gemini ping response must be exactly CAI_PONG".to_owned());
+            }
+            write_json(&run)
+        }
         [command, flag_listen, address] if command == "serve" && flag_listen == "--listen" => {
             let address = address
                 .parse::<SocketAddr>()
@@ -344,5 +372,5 @@ fn write_json(value: &impl serde::Serialize) -> Result<(), String> {
 }
 
 fn usage() -> String {
-    "usage: cai policy resolve --config <cai.yaml> --repository <owner/repository>\n       cai mock plan --config <cai.yaml> --repository <owner/repository> [--quota-exhausted]\n       cai mock evidence --config <cai.yaml> --repository <owner/repository> --output-root <directory> --run-id <run-id>\n       cai mock run --config <cai.yaml> --repository <owner/repository> --output-root <directory> --state-db <database> --run-id <run-id>\n       cai executor mock --envelope <task.json> --fleet-secret <hex-file> --host-verify-key <hex-file> --executor-signing-key <hex-file> --tenant <tenant-id> --now <unix-seconds> --task-directory <tmpfs-directory> --result-output <result.json>\n       cai serve --listen <loopback-address:port>".to_owned()
+    "usage: cai policy resolve --config <cai.yaml> --repository <owner/repository>\n       cai mock plan --config <cai.yaml> --repository <owner/repository> [--quota-exhausted]\n       cai mock evidence --config <cai.yaml> --repository <owner/repository> --output-root <directory> --run-id <run-id>\n       cai mock run --config <cai.yaml> --repository <owner/repository> --output-root <directory> --state-db <database> --run-id <run-id>\n       cai executor mock --envelope <task.json> --fleet-secret <hex-file> --host-verify-key <hex-file> --executor-signing-key <hex-file> --tenant <tenant-id> --now <unix-seconds> --task-directory <tmpfs-directory> --result-output <result.json>\n       cai provider gemini ping --binary <gemini-cli> --workspace <directory>\n       cai serve --listen <loopback-address:port>".to_owned()
 }

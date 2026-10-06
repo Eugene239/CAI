@@ -45,6 +45,12 @@ The deterministic executor CLI test path creates a new Unix mode-`0700` task dir
 
 For the deterministic round-trip proof, the mock executor echoes the prompt recovered from the encrypted task payload into the encrypted result output. The CLI end-to-end test generates a fresh UUID v4 and verifies that the UUID is absent from both serialized envelopes while the CAI host recovers the exact value after result decryption.
 
+## Gemini CLI adapter prototype
+
+The Rust core also has a deliberately narrow local Gemini CLI wrapper for validating the native headless command contract. `cai provider gemini ping --binary <gemini-cli> --workspace <directory>` invokes the supplied executable directly, without a shell, as `gemini --prompt CAI_PING --output-format json --approval-mode plan`. It requires the structured JSON response to be exactly `CAI_PONG`; malformed JSON fails closed. Native exit code `42` is normalized as invalid input and `53` as a turn-limit failure; other non-zero exits are provider failures.
+
+This is a tested ping-only adapter boundary, not real provider execution: it does not materialize credentials, accept encrypted task envelopes, run arbitrary prompts, preserve sessions, or participate in GitHub workflows. A real Gemini task adapter must add those capabilities only after the executor service and its credential boundary are implemented.
+
 ## GitHub Action distribution
 
 The thin TypeScript Action wrapper downloads the Linux x86_64 Rust binary from an immutable URL and verifies its published SHA-256 checksum before execution. It invokes `cai mock run` with explicit policy, repository, evidence-root, SQLite-ledger, and run-ID inputs; then it validates the one-document JSON result and publishes the plan-only outcome, provider/model, evidence directory, and run ID as Action outputs.
