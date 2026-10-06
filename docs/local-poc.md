@@ -2,13 +2,12 @@
 
 ## First deployment shape
 
-The first CAI deployment runs locally in a Docker Compose stack:
+The first CAI deployment runs locally with CAI and SQLite state. Docker Compose is an optional packaging choice, not a required public control plane:
 
 ```text
-Docker Compose
+Local CAI host
 ├─ cai: Rust control-plane service
-├─ cloudflared: Cloudflare Tunnel connector
-└─ cai-state: named Docker volume containing SQLite state
+└─ cai-state: SQLite state
 ```
 
 SQLite is the only persistent store in the first POC. SQLite records App installations, connected repositories, bootstrap state, run ledger records, and OIDC replay-protection data. There is no PostgreSQL, Redis, or automated backup in the first POC.
@@ -21,15 +20,7 @@ The Rust core opens a SQLite database through `rusqlite` with a bundled SQLite b
 
 Docker Compose secrets are mounted read-only into the CAI service. The first POC does not put the GitHub App private key, webhook secret, OAuth credentials, or other credentials in environment variables, command lines, logs, artifacts, or SQLite.
 
-## Public ingress
-
-One Cloudflare Tunnel exposes only:
-
-```text
-POST /webhooks/github
-POST /v1/actions/token-exchange
-GET  /health
-```
+## Local listener and GitHub connectivity
 
 The initial Axum router implements `GET /health` as a stateless, credential-free JSON response. Its listener factory accepts loopback addresses only and rejects public bind addresses before opening a socket. The local server starts with:
 
@@ -37,17 +28,17 @@ The initial Axum router implements `GET /health` as a stateless, credential-free
 cai serve --listen 127.0.0.1:8080
 ```
 
-It writes one JSON document with the bound listener address, then serves until stopped. Webhook and OIDC exchange handlers remain unimplemented. CAI UI and administrative APIs stay private. The local CAI machine does not need a public listener, public IP address, or inbound port forwarding.
+It writes one JSON document with the bound listener address, then serves until stopped. GitHub integration and executor dispatch use outbound GitHub API calls. The local CAI machine does not need a public listener, public IP address, inbound port forwarding, or a direct network connection to an executor runner.
 
 ## First vertical proof
 
-The first end-to-end proof runs against `Eugene239/CAI` itself:
+The completed first end-to-end proof ran against `Eugene239/CAI` itself:
 
-1. Install the CAI GitHub App and explicitly confirm bootstrap.
-2. Review and merge the bootstrap workflow pull request.
+1. Publish the immutable CAI release and verify its published SHA-256 sidecar.
+2. Merge the manual plan-only workflow and the authorized `cai` label trigger.
 3. Add the `cai` label to a controlled issue.
 4. Run the deterministic mock provider on a GitHub-hosted runner.
-5. Validate the GitHub OIDC token exchange, fresh App installation token, final comment, and seven-day artifact.
+5. Validate the retained seven-day evidence artifact.
 6. Confirm that the run is plan-only and creates no code change or pull request.
 
 The POC does not connect a real OAuth provider, execute on an operator-owned self-hosted runner, or create a delivery pull request.
@@ -75,4 +66,4 @@ It writes evidence only under the supplied output root and reports one JSON docu
 cai mock run --config /path/to/cai.yaml --repository owner/repository --output-root /path/to/evidence --state-db /path/to/cai.sqlite --run-id mock-run-001
 ```
 
-It makes no GitHub or repository writes. The future GitHub Action will upload the evidence directory as part of the repository-native run artifact and add redacted prompt, event, and execution-log evidence.
+It makes no GitHub or repository writes. The implemented GitHub Action uploads the evidence directory as part of the repository-native run artifact. Real-provider prompt, event, and execution-log handling remain future work.

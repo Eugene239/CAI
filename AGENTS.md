@@ -8,7 +8,7 @@ Repository-facing content is written in English. Discussion outside the reposito
 
 ## Current phase
 
-CAI has an initial Rust policy-resolution and deterministic mock-run CLI plus a thin TypeScript GitHub Action wrapper. The wrapper accepts an immutable Linux x86_64 binary URL and published SHA-256 checksum, then invokes the plan-only mock run and maps its one-document JSON result to Action outputs. GitHub App onboarding, workflow invocation, OIDC exchange, task isolation, real provider execution, artifact upload, comments, and delivery are not implemented yet.
+CAI has a Rust policy-resolution and deterministic mock-run CLI plus a thin TypeScript GitHub Action wrapper. The wrapper accepts an immutable Linux x86_64 binary URL and published SHA-256 checksum, then invokes the plan-only mock run and maps its one-document JSON result to Action outputs. Manual and authorized-label workflows upload retained plan-only evidence. GitHub App onboarding, real provider execution, encrypted executor task envelopes, and delivery remain unimplemented.
 
 CAI's core harness and CLI use Rust. A TypeScript wrapper may be added only for GitHub Action integration. Do not introduce additional languages, runtimes, package managers, frameworks, provider SDKs, or infrastructure dependencies without an explicit project decision.
 
@@ -31,22 +31,22 @@ The initial test baseline is `cargo test` for Rust and `node --test` for the Typ
 
 ## First local POC
 
-- The first deployment is Docker Compose with CAI, `cloudflared`, and SQLite in a named Docker volume.
-- Compose secrets are mounted read-only. Do not use environment variables, command lines, logs, artifacts, or SQLite for credentials.
-- Cloudflare Tunnel exposes only the GitHub webhook, OIDC token exchange, and health endpoints. Keep UI and administrative APIs private.
+- The first deployment is a local CAI host with SQLite state. It reaches GitHub through outbound API calls; it does not require a public listener, tunnel, or inbound port forwarding for executor dispatch.
+- Compose secrets, when Compose is used, are mounted read-only. Do not use environment variables, command lines, logs, artifacts, or SQLite for credentials.
 - The first vertical proof runs plan-only on `Eugene239/CAI` with the deterministic mock provider. It must not create a code change or pull request.
 
 ## Architecture invariants
 
-- GitHub Actions is the MVP execution plane; do not add a custom worker, queue, or persistent execution service without an accepted architecture change.
+- GitHub Actions is the MVP execution plane and schedules eligible runners; do not add a custom worker queue or duplicate GitHub's runner-selection behavior without an accepted architecture change.
 - Each connected repository receives CAI through a ready-for-review bootstrap pull request. Do not commit a CAI workflow directly to a default branch.
 - Bootstrap uses GitHub-hosted runners for public repositories and `self-hosted` for private repositories. CAI must never fall back to an operator-owned runner when a repository has no eligible runner.
 - Every task runs in a container with a clean workspace and scoped mounts.
 - A task has a 60-minute wall-clock limit by default; repository policy may lower it.
-- CAI automatically selects provider and model from policy. Authorized labels may override the selection.
+- CAI selects the next healthy subscription session in a round-robin provider ring before dispatch. Authorized provider/model labels may override the selection; neither unavailable overrides nor failed started runs silently fall back.
 - The provider-adapter contract is provider-neutral. The first adapter is deterministic and mock-only.
 - The first end-to-end workflow is plan-only: a `cai` label starts a mock run, uploads evidence, and makes no repository changes.
 - A task container runs on the selected GitHub runner, not in the CAI deployment. It receives only a per-run workspace and temporary directory; do not mount host credentials, SSH agents, Docker sockets, home directories, or arbitrary host paths.
+- A real provider task is an opaque, CAI-signed envelope encrypted to the tenant executor-fleet key. GitHub selects any available runner in that tenant's dedicated pool; CAI must not select a physical runner or run a parallel queue. Executors materialize minimal provider session state only in private per-task tmpfs storage and return encrypted results to the CAI host.
 - A task container never receives a GitHub write token. The CAI Action delivers changes outside the container with a fresh App installation token issued through validated GitHub OIDC.
 - CAI creates ready-for-review pull requests, not draft pull requests. It does not wait for, parse, retry, or fix repository-native CI.
 - Network and container resource policy are not standardized in the MVP.
@@ -96,3 +96,4 @@ For implementation changes, run every documented relevant check. Do not claim a 
 - Run artifacts retain the effective prompt and redacted execution logs for seven days by default; repository policy may reduce retention to one through six days.
 - Keep GitHub identity, runner identity, provider identity, and task identity distinct in run evidence.
 - Provider credentials must not enter repository files or artifacts.
+- Provider sessions remain in the CAI host vault and are never GitHub secrets. GitHub App credentials, CAI-host signing keys, and executor-fleet keys are distinct.

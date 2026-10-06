@@ -12,10 +12,9 @@
 
 - GitHub App webhook verification and idempotency.
 - OAuth login and repository onboarding.
-- Docker Compose deployment for CAI and Cloudflare Tunnel ingress.
+- GitHub App installation lifecycle or self-hosted App manifest onboarding.
 - SQLite state in a named Docker volume; no PostgreSQL, Redis, or automated backup in the first POC.
-- Docker Compose secrets for App and OAuth credentials.
-- Runner-pool enrollment and health reporting.
+- Tenant-scoped executor-pool enrollment and health reporting.
 - Durable run ledger and policy decision record.
 - Read-only repository inspection run.
 
@@ -25,9 +24,13 @@
 - Run a plan-only deterministic mock task on a GitHub-hosted runner.
 - Prove OIDC token exchange, final usage comment, and run artifact.
 
-## Phase 2 — First provider and pull-request delivery
+## Phase 2 — Subscription sessions and first provider
 
-- OAuth adapter contract and deterministic mock usage reporting.
+- Subscription-session adapter contract and deterministic mock usage reporting.
+- Host-held provider session vault, atomic session leases, and round-robin slot selection.
+- Signed encrypted task envelopes dispatched through GitHub Actions to any eligible executor in a tenant-scoped pool.
+- Per-task tmpfs session materialization, encrypted result return, and validated refresh-state handback.
+- Explicit provider/model overrides with no silent fallback; quota and authentication failures fail closed.
 - Isolated execution contract.
 - Evidence collector and final GitHub run comment.
 - Issue or comment to evidence-backed ready-for-review pull request.
