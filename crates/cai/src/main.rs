@@ -280,7 +280,7 @@ fn run_executor_mock(inputs: ExecutorMockInputs<'_>) -> Result<(), String> {
                 tenant_id: payload.tenant_id.clone(),
                 task_id: payload.task_id.clone(),
                 outcome: "completed".to_owned(),
-                output: "Deterministic executor mock completed.".to_owned(),
+                output: payload.prompt.clone(),
             },
             &payload.result_public_key,
             &executor_signing_key,
