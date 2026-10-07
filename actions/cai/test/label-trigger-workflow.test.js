@@ -12,7 +12,7 @@ test("the cai label workflow is issue-label-only and fails closed on initiator a
     "utf8",
   );
 
-  assert.match(workflow, /issues:\n\s+types: \[labeled\]/);
+  assert.match(workflow, /issues:\r?\n\s+types: \[labeled\]/);
   assert.match(workflow, /contents: read/);
   assert.match(workflow, /issues: read/);
   assert.match(workflow, /github\.event\.label\.name == 'cai'/);
