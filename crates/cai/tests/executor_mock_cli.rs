@@ -8,6 +8,7 @@ use std::{
 
 use cai::envelope::{SessionFile, TaskPayload, open_result, seal_task};
 use ed25519_dalek::SigningKey;
+use rand_core::{OsRng, RngCore};
 use x25519_dalek::{PublicKey, StaticSecret};
 
 static NEXT_TEMPORARY_ROOT: AtomicU64 = AtomicU64::new(0);
@@ -22,6 +23,7 @@ struct Fixture {
     result_path: PathBuf,
     host_result_secret: StaticSecret,
     executor_signing_key: SigningKey,
+    mock_response_uuid: String,
 }
 
 fn temporary_root() -> PathBuf {
@@ -40,6 +42,33 @@ fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
+fn random_uuid_v4() -> String {
+    let mut bytes = [0_u8; 16];
+    OsRng.fill_bytes(&mut bytes);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+    format!(
+        "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
+        bytes[0],
+        bytes[1],
+        bytes[2],
+        bytes[3],
+        bytes[4],
+        bytes[5],
+        bytes[6],
+        bytes[7],
+        bytes[8],
+        bytes[9],
+        bytes[10],
+        bytes[11],
+        bytes[12],
+        bytes[13],
+        bytes[14],
+        bytes[15],
+    )
+}
+
 fn fixture() -> Fixture {
     let root = temporary_root();
     fs::create_dir_all(&root).expect("temporary root");
@@ -49,13 +78,14 @@ fn fixture() -> Fixture {
     let host_result_secret = StaticSecret::from([3; 32]);
     let host_result_public = PublicKey::from(&host_result_secret);
     let fleet_public = PublicKey::from(&fleet_secret);
+    let mock_response_uuid = random_uuid_v4();
     let payload = TaskPayload {
         tenant_id: "tenant-a".to_owned(),
         task_id: "task-001".to_owned(),
         expires_at_unix_seconds: 1_000,
         repository: "owner/repository".to_owned(),
         workflow_ref: ".github/workflows/cai-executor.yml@refs/heads/main".to_owned(),
-        prompt: "produce a deterministic mock plan".to_owned(),
+        prompt: mock_response_uuid.clone(),
         session_files: vec![SessionFile {
             name: "mock-auth.json".to_owned(),
             contents: "fake-session-only".to_owned(),
@@ -97,6 +127,7 @@ fn fixture() -> Fixture {
         result_path,
         host_result_secret,
         executor_signing_key,
+        mock_response_uuid,
     }
 }
 
@@ -139,8 +170,13 @@ fn run_executor(fixture: &Fixture) -> std::process::Output {
 }
 
 #[test]
-fn executor_cli_materializes_a_mock_session_and_returns_an_encrypted_result() {
+fn executor_cli_returns_decrypted_mock_uuid_in_an_encrypted_result() {
     let fixture = fixture();
+    let encrypted_task = fs::read_to_string(&fixture.envelope_path).expect("encrypted task");
+    assert!(
+        !encrypted_task.contains(&fixture.mock_response_uuid),
+        "mock response UUID must be encrypted in the task envelope"
+    );
     let output = run_executor(&fixture);
 
     assert!(
@@ -153,9 +189,13 @@ fn executor_cli_materializes_a_mock_session_and_returns_an_encrypted_result() {
         !fixture.task_directory.exists(),
         "executor must remove session tmpfs"
     );
+    let encrypted_result_json = fs::read(&fixture.result_path).expect("result written");
+    assert!(
+        !String::from_utf8_lossy(&encrypted_result_json).contains(&fixture.mock_response_uuid),
+        "mock response UUID must be encrypted in the task result"
+    );
     let encrypted_result =
-        serde_json::from_slice(&fs::read(&fixture.result_path).expect("result written"))
-            .expect("encrypted result JSON");
+        serde_json::from_slice(&encrypted_result_json).expect("encrypted result JSON");
     let result = open_result(
         &encrypted_result,
         &fixture.host_result_secret,
@@ -165,7 +205,7 @@ fn executor_cli_materializes_a_mock_session_and_returns_an_encrypted_result() {
     )
     .expect("host opens result");
     assert_eq!(result.outcome, "completed");
-    assert_eq!(result.output, "Deterministic executor mock completed.");
+    assert_eq!(result.output, fixture.mock_response_uuid);
 
     fs::remove_dir_all(fixture.root).expect("remove temporary root");
 }

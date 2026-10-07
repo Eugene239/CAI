@@ -43,6 +43,8 @@ The Rust core implements the transport primitive for a future trusted self-hoste
 
 The deterministic executor CLI test path creates a new Unix mode-`0700` task directory, materializes only validated session-file names, keeps ownership of only that newly created directory for cleanup, writes an Ed25519-signed encrypted result for the CAI host only after cleanup succeeds, and removes the task directory before it exits. A pre-existing task directory is rejected and never deleted. Its caller must provide an executor-controlled tmpfs parent; the primitive does not itself verify the filesystem type. It is not a provider adapter and does not accept real provider credentials. GitHub dispatch delivery and a dedicated self-hosted executor service remain future work.
 
+For the deterministic round-trip proof, the mock executor echoes the prompt recovered from the encrypted task payload into the encrypted result output. The CLI end-to-end test generates a fresh UUID v4 and verifies that the UUID is absent from both serialized envelopes while the CAI host recovers the exact value after result decryption.
+
 ## GitHub Action distribution
 
 The thin TypeScript Action wrapper downloads the Linux x86_64 Rust binary from an immutable URL and verifies its published SHA-256 checksum before execution. It invokes `cai mock run` with explicit policy, repository, evidence-root, SQLite-ledger, and run-ID inputs; then it validates the one-document JSON result and publishes the plan-only outcome, provider/model, evidence directory, and run ID as Action outputs.
