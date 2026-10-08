@@ -1,8 +1,28 @@
 use std::{error::Error, fmt, path::Path};
 
 use rusqlite::{Connection, OptionalExtension, params};
+use sha2::{Digest, Sha256};
 
 use crate::MockRun;
+
+const MIGRATIONS: &[Migration] = &[
+    Migration {
+        version: 1,
+        name: "run_ledger",
+        sql: include_str!("../migrations/0001_run_ledger.sql"),
+    },
+    Migration {
+        version: 2,
+        name: "executor_admissions",
+        sql: include_str!("../migrations/0002_executor_admissions.sql"),
+    },
+];
+
+struct Migration {
+    version: u32,
+    name: &'static str,
+    sql: &'static str,
+}
 
 pub struct RunLedger {
     connection: Connection,
@@ -21,6 +41,32 @@ pub struct StoredRun {
     pub total_tokens: u64,
     pub quota_state: String,
     pub policy_sha256: String,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct StoredExecutorAdmission {
+    pub tenant_id: String,
+    pub task_id: String,
+    pub repository: String,
+    pub workflow_ref: String,
+    pub expires_at_unix_seconds: u64,
+    pub admitted_at_unix_seconds: u64,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct ExecutorAdmission<'a> {
+    pub tenant_id: &'a str,
+    pub task_id: &'a str,
+    pub repository: &'a str,
+    pub workflow_ref: &'a str,
+    pub expires_at_unix_seconds: u64,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct ExecutorAuthorization<'a> {
+    pub tenant_id: &'a str,
+    pub repository: &'a str,
+    pub workflow_ref: &'a str,
 }
 
 #[derive(Debug)]
@@ -42,25 +88,8 @@ impl From<rusqlite::Error> for LedgerError {
 
 impl RunLedger {
     pub fn open(path: &Path) -> Result<Self, LedgerError> {
-        let connection = Connection::open(path)?;
-        connection.execute_batch(
-            "
-            CREATE TABLE IF NOT EXISTS runs (
-                run_id TEXT PRIMARY KEY NOT NULL,
-                repository TEXT NOT NULL,
-                outcome TEXT NOT NULL,
-                execution_mode TEXT NOT NULL,
-                provider TEXT NOT NULL,
-                model TEXT NOT NULL,
-                input_tokens INTEGER NOT NULL,
-                output_tokens INTEGER NOT NULL,
-                total_tokens INTEGER NOT NULL,
-                quota_state TEXT NOT NULL,
-                policy_sha256 TEXT NOT NULL
-            );
-            ",
-        )?;
-
+        let mut connection = Connection::open(path)?;
+        apply_migrations(&mut connection)?;
         Ok(Self { connection })
     }
 
@@ -125,9 +154,180 @@ impl RunLedger {
             .optional()
             .map_err(Into::into)
     }
+
+    pub fn admit_executor_task(
+        &mut self,
+        admission: &ExecutorAdmission<'_>,
+        authorization: &ExecutorAuthorization<'_>,
+        now_unix_seconds: u64,
+    ) -> Result<(), LedgerError> {
+        authorize(admission, authorization, now_unix_seconds)?;
+        let inserted = self.connection.execute(
+            "
+            INSERT INTO executor_admissions (
+                tenant_id, task_id, repository, workflow_ref,
+                expires_at_unix_seconds, admitted_at_unix_seconds
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT (tenant_id, task_id) DO NOTHING
+            ",
+            params![
+                admission.tenant_id,
+                admission.task_id,
+                admission.repository,
+                admission.workflow_ref,
+                as_sqlite_integer(admission.expires_at_unix_seconds)?,
+                as_sqlite_integer(now_unix_seconds)?,
+            ],
+        )?;
+        if inserted == 0 {
+            return Err(LedgerError("executor task was already admitted".to_owned()));
+        }
+
+        Ok(())
+    }
+
+    pub fn get_executor_admission(
+        &self,
+        tenant_id: &str,
+        task_id: &str,
+    ) -> Result<Option<StoredExecutorAdmission>, LedgerError> {
+        self.connection
+            .query_row(
+                "
+                SELECT tenant_id, task_id, repository, workflow_ref,
+                       expires_at_unix_seconds, admitted_at_unix_seconds
+                FROM executor_admissions
+                WHERE tenant_id = ? AND task_id = ?
+                ",
+                params![tenant_id, task_id],
+                |row| {
+                    Ok(StoredExecutorAdmission {
+                        tenant_id: row.get(0)?,
+                        task_id: row.get(1)?,
+                        repository: row.get(2)?,
+                        workflow_ref: row.get(3)?,
+                        expires_at_unix_seconds: row.get(4)?,
+                        admitted_at_unix_seconds: row.get(5)?,
+                    })
+                },
+            )
+            .optional()
+            .map_err(Into::into)
+    }
+
+    pub fn applied_schema_versions(&self) -> Result<Vec<u32>, LedgerError> {
+        let mut statement = self
+            .connection
+            .prepare("SELECT version FROM schema_migrations ORDER BY version")?;
+        statement
+            .query_map([], |row| row.get(0))?
+            .collect::<Result<Vec<u32>, _>>()
+            .map_err(Into::into)
+    }
+}
+
+fn apply_migrations(connection: &mut Connection) -> Result<(), LedgerError> {
+    connection.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS schema_migrations (
+            version INTEGER PRIMARY KEY NOT NULL,
+            name TEXT NOT NULL,
+            checksum_sha256 TEXT NOT NULL
+        );
+        ",
+    )?;
+
+    let mut statement = connection
+        .prepare("SELECT version, name, checksum_sha256 FROM schema_migrations ORDER BY version")?;
+    let recorded = statement
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, u32>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+            ))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    drop(statement);
+
+    for (index, (version, name, checksum)) in recorded.iter().enumerate() {
+        if *version
+            > MIGRATIONS
+                .last()
+                .expect("migration list is non-empty")
+                .version
+        {
+            return Err(LedgerError(format!(
+                "unknown schema migration version {version}"
+            )));
+        }
+        let Some(migration) = MIGRATIONS.get(index) else {
+            return Err(LedgerError(format!(
+                "unknown schema migration version {version}"
+            )));
+        };
+        if *version != migration.version {
+            return Err(LedgerError(format!(
+                "schema migration history is not contiguous: expected version {}, found {version}",
+                migration.version
+            )));
+        }
+        let expected_checksum = format!("{:x}", Sha256::digest(migration.sql.as_bytes()));
+        if *name != migration.name || *checksum != expected_checksum {
+            return Err(LedgerError(format!(
+                "schema migration {} does not match its recorded definition",
+                migration.version
+            )));
+        }
+    }
+
+    for migration in &MIGRATIONS[recorded.len()..] {
+        let checksum = format!("{:x}", Sha256::digest(migration.sql.as_bytes()));
+        let transaction = connection.transaction()?;
+        transaction.execute_batch(migration.sql)?;
+        transaction.execute(
+            "INSERT INTO schema_migrations (version, name, checksum_sha256) VALUES (?, ?, ?)",
+            params![migration.version, migration.name, checksum],
+        )?;
+        transaction.commit()?;
+    }
+
+    Ok(())
+}
+
+fn authorize(
+    admission: &ExecutorAdmission<'_>,
+    authorization: &ExecutorAuthorization<'_>,
+    now_unix_seconds: u64,
+) -> Result<(), LedgerError> {
+    for (name, value) in [
+        ("tenant ID", admission.tenant_id),
+        ("task ID", admission.task_id),
+        ("repository", admission.repository),
+        ("workflow ref", admission.workflow_ref),
+    ] {
+        if value.trim().is_empty() {
+            return Err(LedgerError(format!(
+                "executor admission {name} must not be empty"
+            )));
+        }
+    }
+    if admission.tenant_id != authorization.tenant_id {
+        return Err(LedgerError("tenant is not authorized".to_owned()));
+    }
+    if admission.repository != authorization.repository {
+        return Err(LedgerError("repository is not authorized".to_owned()));
+    }
+    if admission.workflow_ref != authorization.workflow_ref {
+        return Err(LedgerError("workflow ref is not authorized".to_owned()));
+    }
+    if admission.expires_at_unix_seconds <= now_unix_seconds {
+        return Err(LedgerError("executor task has expired".to_owned()));
+    }
+
+    Ok(())
 }
 
 fn as_sqlite_integer(value: u64) -> Result<i64, LedgerError> {
-    i64::try_from(value)
-        .map_err(|_| LedgerError("token count exceeds SQLite integer range".to_owned()))
+    i64::try_from(value).map_err(|_| LedgerError("value exceeds SQLite integer range".to_owned()))
 }
