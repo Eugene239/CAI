@@ -31,7 +31,7 @@
 - Signed encrypted task envelopes dispatched through GitHub Actions to any eligible executor in a tenant-scoped pool.
 - Per-task tmpfs session materialization, encrypted result return, and validated refresh-state handback.
 - Explicit provider/model overrides with no silent fallback; quota and authentication failures fail closed.
-- Isolated execution contract.
+- Isolated execution contract: the MVP provider task only creates a ready-for-review pull request and does not run repository build/test/lint commands or require project SDK matrices.
 - Evidence collector and final GitHub run comment.
 - Issue or comment to evidence-backed ready-for-review pull request.
 - GitHub status and cancellation flow.
