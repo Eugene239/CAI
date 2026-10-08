@@ -43,7 +43,7 @@ The initial test baseline is `cargo test` for Rust and `node --test` for the Typ
 - Every task runs in a container with a clean workspace and scoped mounts.
 - A task has a 60-minute wall-clock limit by default; repository policy may lower it.
 - CAI selects the next healthy subscription session in a round-robin provider ring before dispatch. Authorized provider/model labels may override the selection; neither unavailable overrides nor failed started runs silently fall back.
-- The provider-adapter contract is provider-neutral. The first adapter is deterministic and mock-only.
+- The provider-adapter contract is provider-neutral. The only adapter integrated with executor transport is deterministic mock; Gemini currently has a tested local headless ping contract only, without task-envelope execution, credential materialization, or GitHub dispatch.
 - The first end-to-end workflow is plan-only: a `cai` label starts a mock run, uploads evidence, and makes no repository changes.
 - MVP write-capable tasks may edit their scoped workspace and produce a ready-for-review PR only. They do not run repository build, test, lint, packaging, or deployment commands, so MVP task images do not need project SDK/toolchain matrices. Repository-native GitHub CI and ordinary human review own validation.
 - A task container runs on the selected GitHub runner, not in the CAI deployment. It receives only a per-run workspace and temporary directory; do not mount host credentials, SSH agents, Docker sockets, home directories, or arbitrary host paths.
