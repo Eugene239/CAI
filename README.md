@@ -13,7 +13,7 @@ CAI is not a model provider, an IDE, or a replacement for GitHub. GitHub remains
 - **Private-repository ready:** repositories are explicitly selected through a GitHub App installation.
 - **Isolated execution:** every task runs in an ephemeral, policy-bound environment.
 - **Ready-for-review PR by default:** agents may prepare work; humans retain merge and deployment authority.
-- **Evidence before claims:** test output, changed files, commit SHA, agent events, and policy decisions are recorded for every run.
+- **Evidence before claims:** CAI records task, changed-file, delivery, agent-event, and policy evidence for every run; repository-native CI independently owns build/test results and their logs.
 - **Provider-neutral:** Claude, Codex, Cursor, AGY, and future providers are adapters rather than dependencies of the control plane.
 - **Dogfood in the open:** CAI is built and used through its own GitHub workflow.
 

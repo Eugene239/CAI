@@ -16,7 +16,7 @@ The first CAI deployment is Docker Compose with a local SQLite database in a nam
 
 ## MVP task scope
 
-The MVP is intentionally **pull-request creation only**. A provider task may inspect and edit its scoped workspace, produce a diff, and return evidence needed for CAI delivery. It does not run repository build, test, lint, packaging, or deployment commands, and MVP task images need only the provider runtime, CAI runtime, Git, and basic workspace tools—not project SDK matrices such as Rust, JDK/Gradle, or Android SDK.
+The MVP write-capable provider task is intentionally **pull-request creation only**. A provider task may inspect and edit its scoped workspace, produce a diff, and return evidence needed for CAI delivery. It does not run repository build, test, lint, packaging, or deployment commands, and MVP task images need only the provider runtime, CAI runtime, Git, and basic workspace tools—not project SDK matrices such as Rust, JDK/Gradle, or Android SDK.
 
 The CAI delivery step creates or updates a ready-for-review pull request. Repository-native GitHub CI is the only build-and-test authority for that MVP pull request, and ordinary human review is required. CAI does not wait for, parse, retry, or fix that CI. A future read-only agent review remains separate work and must not be treated as an MVP merge gate.
 
