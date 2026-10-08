@@ -113,12 +113,7 @@ impl GeminiCli {
             .stderr(Stdio::piped());
         #[cfg(unix)]
         command.process_group(0);
-        let mut child = command.spawn().map_err(|error| {
-            ProviderError(format!(
-                "could not start Gemini CLI {}: {error}",
-                self.binary.display()
-            ))
-        })?;
+        let mut child = spawn_gemini(&mut command, &self.binary)?;
         let started_at = Instant::now();
         let output = loop {
             if child
@@ -177,6 +172,27 @@ impl GeminiCli {
             provider_status: None,
         })
     }
+}
+
+fn spawn_gemini(command: &mut Command, binary: &Path) -> Result<Child, ProviderError> {
+    const EXECUTABLE_BUSY_RETRIES: u8 = 10;
+
+    for attempt in 0..=EXECUTABLE_BUSY_RETRIES {
+        match command.spawn() {
+            Ok(child) => return Ok(child),
+            Err(error) if error.raw_os_error() == Some(26) && attempt < EXECUTABLE_BUSY_RETRIES => {
+                thread::sleep(Duration::from_millis(10));
+            }
+            Err(error) => {
+                return Err(ProviderError(format!(
+                    "could not start Gemini CLI {}: {error}",
+                    binary.display()
+                )));
+            }
+        }
+    }
+
+    unreachable!("retry loop returns or errors")
 }
 
 fn terminate_process_tree(child: &mut Child) {

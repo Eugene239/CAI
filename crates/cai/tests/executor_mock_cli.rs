@@ -19,6 +19,7 @@ struct Fixture {
     fleet_secret_path: PathBuf,
     host_verify_path: PathBuf,
     executor_signing_path: PathBuf,
+    state_database_path: PathBuf,
     task_directory: PathBuf,
     result_path: PathBuf,
     host_result_secret: StaticSecret,
@@ -98,6 +99,7 @@ fn fixture() -> Fixture {
     let fleet_secret_path = root.join("fleet-secret.hex");
     let host_verify_path = root.join("host-verify.hex");
     let executor_signing_path = root.join("executor-signing.hex");
+    let state_database_path = root.join("executor-state.sqlite");
     let task_directory = root.join("task-tmpfs");
     let result_path = root.join("result.json");
     fs::write(
@@ -123,6 +125,7 @@ fn fixture() -> Fixture {
         fleet_secret_path,
         host_verify_path,
         executor_signing_path,
+        state_database_path,
         task_directory,
         result_path,
         host_result_secret,
@@ -153,6 +156,15 @@ fn run_executor(fixture: &Fixture) -> std::process::Output {
                 .executor_signing_path
                 .to_str()
                 .expect("UTF-8 executor signing"),
+            "--state-database",
+            fixture
+                .state_database_path
+                .to_str()
+                .expect("UTF-8 state database"),
+            "--repository",
+            "owner/repository",
+            "--workflow-ref",
+            ".github/workflows/cai-executor.yml@refs/heads/main",
             "--tenant",
             "tenant-a",
             "--now",
@@ -207,6 +219,28 @@ fn executor_cli_returns_decrypted_mock_uuid_in_an_encrypted_result() {
     assert_eq!(result.outcome, "completed");
     assert_eq!(result.output, fixture.mock_response_uuid);
 
+    fs::remove_dir_all(fixture.root).expect("remove temporary root");
+}
+
+#[test]
+fn executor_cli_rejects_replayed_envelope_after_process_restart() {
+    let fixture = fixture();
+    let first = run_executor(&fixture);
+    assert!(first.status.success(), "first execution must succeed");
+    let first_result = fs::read(&fixture.result_path).expect("first result");
+
+    let replay = run_executor(&fixture);
+
+    assert!(!replay.status.success(), "replay must fail");
+    assert!(String::from_utf8_lossy(&replay.stderr).contains("already admitted"));
+    assert_eq!(
+        fs::read(&fixture.result_path).expect("result remains"),
+        first_result
+    );
+    assert!(
+        !fixture.task_directory.exists(),
+        "replayed task must not materialize a new task directory"
+    );
     fs::remove_dir_all(fixture.root).expect("remove temporary root");
 }
 

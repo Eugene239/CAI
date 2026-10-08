@@ -40,6 +40,9 @@ struct ExecutorMockInputs<'a> {
     fleet_secret_path: &'a str,
     host_verify_key_path: &'a str,
     executor_signing_key_path: &'a str,
+    state_database_path: &'a str,
+    repository: &'a str,
+    workflow_ref: &'a str,
     tenant_id: &'a str,
     now: &'a str,
     task_directory: &'a str,
@@ -189,6 +192,12 @@ async fn run() -> Result<(), String> {
             host_verify_key_path,
             flag_executor_signing_key,
             executor_signing_key_path,
+            flag_state_database,
+            state_database_path,
+            flag_repository,
+            repository,
+            flag_workflow_ref,
+            workflow_ref,
             flag_tenant,
             tenant_id,
             flag_now,
@@ -203,6 +212,9 @@ async fn run() -> Result<(), String> {
             && flag_fleet_secret == "--fleet-secret"
             && flag_host_verify_key == "--host-verify-key"
             && flag_executor_signing_key == "--executor-signing-key"
+            && flag_state_database == "--state-database"
+            && flag_repository == "--repository"
+            && flag_workflow_ref == "--workflow-ref"
             && flag_tenant == "--tenant"
             && flag_now == "--now"
             && flag_task_directory == "--task-directory"
@@ -213,6 +225,9 @@ async fn run() -> Result<(), String> {
                 fleet_secret_path,
                 host_verify_key_path,
                 executor_signing_key_path,
+                state_database_path,
+                repository,
+                workflow_ref,
                 tenant_id,
                 now,
                 task_directory,
@@ -271,20 +286,42 @@ async fn run() -> Result<(), String> {
 fn run_executor_mock(inputs: ExecutorMockInputs<'_>) -> Result<(), String> {
     let envelope: cai::envelope::EncryptedTaskEnvelope =
         read_json(inputs.envelope_path, "task envelope")?;
-    let fleet_secret = StaticSecret::from(read_hex_key(inputs.fleet_secret_path, "fleet secret")?);
     let host_verify_key = VerifyingKey::from_bytes(&read_hex_key(
         inputs.host_verify_key_path,
         "host verification key",
     )?)
     .map_err(|error| format!("invalid host verification key: {error}"))?;
-    let executor_signing_key = SigningKey::from_bytes(&read_hex_key(
-        inputs.executor_signing_key_path,
-        "executor signing key",
-    )?);
     let now = inputs
         .now
         .parse::<u64>()
         .map_err(|error| format!("invalid executor clock value {:?}: {error}", inputs.now))?;
+    let metadata =
+        cai::envelope::inspect_task_metadata(&envelope, &host_verify_key, inputs.tenant_id, now)
+            .map_err(|error| error.to_string())?;
+    let mut ledger = cai::ledger::RunLedger::open(Path::new(inputs.state_database_path))
+        .map_err(|error| error.to_string())?;
+    ledger
+        .admit_executor_task(
+            &cai::ledger::ExecutorAdmission {
+                tenant_id: &metadata.tenant_id,
+                task_id: &metadata.task_id,
+                repository: &metadata.repository,
+                workflow_ref: &metadata.workflow_ref,
+                expires_at_unix_seconds: metadata.expires_at_unix_seconds,
+            },
+            &cai::ledger::ExecutorAuthorization {
+                tenant_id: inputs.tenant_id,
+                repository: inputs.repository,
+                workflow_ref: inputs.workflow_ref,
+            },
+            now,
+        )
+        .map_err(|error| error.to_string())?;
+    let fleet_secret = StaticSecret::from(read_hex_key(inputs.fleet_secret_path, "fleet secret")?);
+    let executor_signing_key = SigningKey::from_bytes(&read_hex_key(
+        inputs.executor_signing_key_path,
+        "executor signing key",
+    )?);
     let payload = cai::envelope::open_task(
         &envelope,
         &fleet_secret,
@@ -372,5 +409,5 @@ fn write_json(value: &impl serde::Serialize) -> Result<(), String> {
 }
 
 fn usage() -> String {
-    "usage: cai policy resolve --config <cai.yaml> --repository <owner/repository>\n       cai mock plan --config <cai.yaml> --repository <owner/repository> [--quota-exhausted]\n       cai mock evidence --config <cai.yaml> --repository <owner/repository> --output-root <directory> --run-id <run-id>\n       cai mock run --config <cai.yaml> --repository <owner/repository> --output-root <directory> --state-db <database> --run-id <run-id>\n       cai executor mock --envelope <task.json> --fleet-secret <hex-file> --host-verify-key <hex-file> --executor-signing-key <hex-file> --tenant <tenant-id> --now <unix-seconds> --task-directory <tmpfs-directory> --result-output <result.json>\n       cai provider gemini ping --binary <gemini-cli> --workspace <directory>\n       cai serve --listen <loopback-address:port>".to_owned()
+    "usage: cai policy resolve --config <cai.yaml> --repository <owner/repository>\n       cai mock plan --config <cai.yaml> --repository <owner/repository> [--quota-exhausted]\n       cai mock evidence --config <cai.yaml> --repository <owner/repository> --output-root <directory> --run-id <run-id>\n       cai mock run --config <cai.yaml> --repository <owner/repository> --output-root <directory> --state-db <database> --run-id <run-id>\n       cai executor mock --envelope <task.json> --fleet-secret <hex-file> --host-verify-key <hex-file> --executor-signing-key <hex-file> --state-database <database> --repository <owner/repository> --workflow-ref <workflow-ref> --tenant <tenant-id> --now <unix-seconds> --task-directory <tmpfs-directory> --result-output <result.json>\n       cai provider gemini ping --binary <gemini-cli> --workspace <directory>\n       cai serve --listen <loopback-address:port>".to_owned()
 }

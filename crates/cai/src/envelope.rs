@@ -137,16 +137,13 @@ pub fn seal_task(
     Ok(envelope)
 }
 
-pub fn open_task(
+pub fn inspect_task_metadata(
     envelope: &EncryptedTaskEnvelope,
-    fleet_secret: &StaticSecret,
     verifying_key: &VerifyingKey,
     expected_tenant_id: &str,
     now_unix_seconds: u64,
-    replay_guard: &mut ReplayGuard,
-) -> Result<TaskPayload, EnvelopeError> {
+) -> Result<TaskMetadata, EnvelopeError> {
     verify_signature(envelope, verifying_key)?;
-
     if envelope.metadata.version != ENVELOPE_VERSION {
         return Err(EnvelopeError(
             "unsupported task envelope version".to_owned(),
@@ -160,6 +157,24 @@ pub fn open_task(
     if envelope.metadata.expires_at_unix_seconds <= now_unix_seconds {
         return Err(EnvelopeError("task envelope has expired".to_owned()));
     }
+
+    Ok(envelope.metadata.clone())
+}
+
+pub fn open_task(
+    envelope: &EncryptedTaskEnvelope,
+    fleet_secret: &StaticSecret,
+    verifying_key: &VerifyingKey,
+    expected_tenant_id: &str,
+    now_unix_seconds: u64,
+    replay_guard: &mut ReplayGuard,
+) -> Result<TaskPayload, EnvelopeError> {
+    inspect_task_metadata(
+        envelope,
+        verifying_key,
+        expected_tenant_id,
+        now_unix_seconds,
+    )?;
 
     let metadata_bytes = serialize(&envelope.metadata, "serialize task metadata")?;
     let ephemeral_public_key = public_key(&envelope.ephemeral_public_key, "ephemeral public key")?;

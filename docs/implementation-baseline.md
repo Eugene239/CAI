@@ -37,9 +37,13 @@ cargo run -p cai -- mock plan --config /path/to/cai.yaml --repository owner/repo
 
 Repository overrides use canonical `owner/repository` identifiers. The first schema ignores unknown fields for forward compatibility. Invalid YAML or missing required resolved values fail the run explicitly.
 
+## SQLite schema migrations
+
+CAI uses ordered, immutable SQL migrations embedded in the Rust binary, rather than ad-hoc `CREATE TABLE` statements. `schema_migrations` records each numeric version, migration name, and SHA-256 checksum. Startup applies missing migrations transactionally and fails closed if an already-recorded version no longer matches its embedded definition. New schema changes must add a later numbered migration file; applied migration files must never be edited.
+
 ## Encrypted executor primitive
 
-The Rust core implements the transport primitive for a future trusted self-hosted executor pool. A CAI host signs a versioned task envelope with Ed25519 and encrypts its payload to the tenant executor-fleet X25519 public key using ChaCha20-Poly1305. The executor verifies the signature, tenant, and expiry before it decrypts or materializes a session file. The current replay guard is in-memory and process-local; durable replay protection remains future work.
+The Rust core implements the transport primitive for a future trusted self-hosted executor pool. A CAI host signs a versioned task envelope with Ed25519 and encrypts its payload to the tenant executor-fleet X25519 public key using ChaCha20-Poly1305. The executor verifies the signature, tenant, and expiry before it decrypts or materializes a session file. The local `ReplayGuard` remains an in-memory unit-test primitive. Separately, the SQLite ledger now provides a restart-safe admission record keyed by tenant and task ID. The mock executor verifies the signed public metadata and enforces the exact tenant/repository/workflow authorization tuple and expiry through that ledger before decrypting or materializing task session files. The dedicated self-hosted executor service and GitHub dispatch path remain future work.
 
 The deterministic executor CLI test path creates a new Unix mode-`0700` task directory, materializes only validated session-file names, keeps ownership of only that newly created directory for cleanup, writes an Ed25519-signed encrypted result for the CAI host only after cleanup succeeds, and removes the task directory before it exits. A pre-existing task directory is rejected and never deleted. Its caller must provide an executor-controlled tmpfs parent; the primitive does not itself verify the filesystem type. It is not a provider adapter and does not accept real provider credentials. GitHub dispatch delivery and a dedicated self-hosted executor service remain future work.
 
