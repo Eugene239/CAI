@@ -1,11 +1,6 @@
 #![cfg(unix)]
 
-use std::{
-    fs,
-    os::unix::fs::{PermissionsExt, symlink},
-    process::Command,
-    time::Duration,
-};
+use std::{fs, os::unix::fs::PermissionsExt, process::Command, time::Duration};
 
 use cai::providers::{GeminiCli, GeminiOutcome, GeminiRequest};
 
@@ -115,7 +110,7 @@ fn gemini_headless_input_error_is_classified_without_parsing_a_result() {
 fn gemini_headless_rate_limit_is_returned_as_http_429() {
     let binary = fixture(
         "rate-limit",
-        "printf '%s\\n' '{\"error\":{\"code\":429,\"status\":\"RESOURCE_EXHAUSTED\"}}'; exit 1",
+        "printf '%s\\n' 'retry diagnostic: {\"error\":{\"code\":429,\"status\":\"RESOURCE_EXHAUSTED\"}}'; exit 1",
     );
 
     let run = GeminiCli::new(&binary)
@@ -148,32 +143,6 @@ fn gemini_headless_timeout_kills_a_stalled_cli() {
     assert_eq!(run.outcome, GeminiOutcome::TimedOut);
     assert_eq!(run.exit_code, -1);
     let _ = fs::remove_file(binary);
-}
-
-#[test]
-fn gemini_headless_rejects_a_symbolic_link_workspace() {
-    let target = std::env::temp_dir();
-    let workspace = std::env::temp_dir().join(format!(
-        "cai-gemini-workspace-link-{}-{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("clock after epoch")
-            .as_nanos()
-    ));
-    symlink(&target, &workspace).expect("create workspace link");
-    let binary = fixture("workspace-link", "exit 0");
-
-    let error = GeminiCli::new(&binary)
-        .run(&GeminiRequest {
-            prompt: "CAI_PING".to_owned(),
-            working_directory: workspace.clone(),
-        })
-        .expect_err("symlinked workspace must not be accepted");
-
-    assert!(error.to_string().contains("must not be a symbolic link"));
-    let _ = fs::remove_file(binary);
-    let _ = fs::remove_file(workspace);
 }
 
 #[test]

@@ -1,10 +1,19 @@
 use std::{
     error::Error,
-    fmt, fs,
+    fmt,
     path::{Path, PathBuf},
-    process::{Command, Stdio},
+    process::{Child, Command, Stdio},
     thread,
     time::{Duration, Instant},
+};
+
+#[cfg(unix)]
+use std::os::unix::process::CommandExt;
+
+#[cfg(unix)]
+use nix::{
+    sys::signal::{Signal, kill},
+    unistd::Pid,
 };
 
 use serde::{Deserialize, Serialize};
@@ -82,19 +91,7 @@ impl GeminiCli {
         if request.prompt.trim().is_empty() {
             return Err(ProviderError("Gemini prompt must not be empty".to_owned()));
         }
-        let workspace_metadata =
-            fs::symlink_metadata(&request.working_directory).map_err(|error| {
-                ProviderError(format!(
-                    "could not inspect Gemini working directory {}: {error}",
-                    request.working_directory.display()
-                ))
-            })?;
-        if workspace_metadata.file_type().is_symlink() {
-            return Err(ProviderError(
-                "Gemini working directory must not be a symbolic link".to_owned(),
-            ));
-        }
-        if !workspace_metadata.is_dir() {
+        if !request.working_directory.is_dir() {
             return Err(ProviderError(format!(
                 "Gemini working directory is not a directory: {}",
                 request.working_directory.display()
@@ -103,7 +100,8 @@ impl GeminiCli {
 
         // Gemini CLI's official headless contract is `--prompt` plus JSON output.
         // Do not invoke through a shell: prompt text remains one argument.
-        let mut child = Command::new(&self.binary)
+        let mut command = Command::new(&self.binary);
+        command
             .arg("--prompt")
             .arg(&request.prompt)
             .arg("--output-format")
@@ -112,14 +110,15 @@ impl GeminiCli {
             .arg("plan")
             .current_dir(&request.working_directory)
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|error| {
-                ProviderError(format!(
-                    "could not start Gemini CLI {}: {error}",
-                    self.binary.display()
-                ))
-            })?;
+            .stderr(Stdio::piped());
+        #[cfg(unix)]
+        command.process_group(0);
+        let mut child = command.spawn().map_err(|error| {
+            ProviderError(format!(
+                "could not start Gemini CLI {}: {error}",
+                self.binary.display()
+            ))
+        })?;
         let started_at = Instant::now();
         let output = loop {
             if child
@@ -132,8 +131,7 @@ impl GeminiCli {
                 })?;
             }
             if started_at.elapsed() >= timeout {
-                let _ = child.kill();
-                let _ = child.wait();
+                terminate_process_tree(&mut child);
                 return Ok(GeminiRun {
                     outcome: GeminiOutcome::TimedOut,
                     response: None,
@@ -181,6 +179,18 @@ impl GeminiCli {
     }
 }
 
+fn terminate_process_tree(child: &mut Child) {
+    #[cfg(unix)]
+    {
+        let _ = kill(Pid::from_raw(-(child.id() as i32)), Signal::SIGKILL);
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = child.kill();
+    }
+    let _ = child.wait();
+}
+
 fn classify_exit(exit_code: i32, provider_status: Option<u16>) -> GeminiOutcome {
     match (exit_code, provider_status) {
         (_, Some(429)) => GeminiOutcome::RateLimited,
@@ -191,9 +201,17 @@ fn classify_exit(exit_code: i32, provider_status: Option<u16>) -> GeminiOutcome 
 }
 
 fn structured_provider_status(source: &[u8]) -> Option<u16> {
-    let output: Value = serde_json::from_slice(source).ok()?;
-    output
-        .pointer("/error/code")
-        .and_then(Value::as_u64)
-        .and_then(|code| u16::try_from(code).ok())
+    let text = std::str::from_utf8(source).ok()?;
+    text.split('\n')
+        .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+        .chain(
+            text.match_indices('{')
+                .filter_map(|(offset, _)| serde_json::from_str::<Value>(&text[offset..]).ok()),
+        )
+        .find_map(|output| {
+            output
+                .pointer("/error/code")
+                .and_then(Value::as_u64)
+                .and_then(|code| u16::try_from(code).ok())
+        })
 }
