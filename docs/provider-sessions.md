@@ -8,6 +8,8 @@ This is an accepted architecture plan. The encrypted envelope, encrypted result,
 
 CAI uses subscription-backed native provider sessions rather than pay-as-you-go API keys. A CAI host owns its provider-session vault and control-plane policy. GitHub Actions remains the queue and execution scheduler.
 
+OpenCode is the accepted first real coding-agent execution runtime. The first OpenCode spike is a narrow exception for validation: it uses one approved API-key-backed provider/model in a disposable task, without changing the target subscription-session operating model. It must not use an unofficial subscription plugin or introduce provider/model/credential fallback. See [OpenCode execution runtime](opencode-runtime.md).
+
 A CAI host does not select a physical worker. It submits an encrypted task envelope to GitHub, and GitHub schedules the job onto any available runner in that host's trusted executor pool.
 
 ```text

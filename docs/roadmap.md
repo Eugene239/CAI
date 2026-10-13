@@ -24,9 +24,12 @@
 - Run a plan-only deterministic mock task on a GitHub-hosted runner.
 - Prove OIDC token exchange, final usage comment, and run artifact.
 
-## Phase 2 — Subscription sessions and first provider
+## Phase 2 — OpenCode runtime proof and provider sessions
 
-- Subscription-session adapter contract and deterministic mock usage reporting.
+- OpenCode executor spike: pin and verify the runtime distribution, run its documented non-interactive interface in a disposable scoped workspace, and collect structured completion and changed-file evidence.
+- First real task proof with one approved API-key-backed provider/model; no OAuth, subscription-session flow, unofficial subscription plugin, or silent provider/model/slot fallback.
+- OpenCode task-adapter containment proof: private per-task credential state, cleanup, process-tree cancellation, deadline enforcement, and no GitHub write authority in the task container.
+- Subscription-session adapter contract and deterministic mock usage reporting after a provider-specific supported authentication flow is accepted.
 - Host-held provider session vault, atomic session leases, and round-robin slot selection.
 - Signed encrypted task envelopes dispatched through GitHub Actions to any eligible executor in a tenant-scoped pool.
 - Per-task tmpfs session materialization, encrypted result return, and validated refresh-state handback.
@@ -42,12 +45,11 @@
 - Minimal web control panel for organizations, repositories, runners, policies, provider connections, and run history.
 - Streamable HTTP MCP server with OAuth for CAI tools and run inspection.
 
-## Phase 4 — Additional provider adapters
+## Phase 4 — Additional agent runtimes and provider paths
 
-- Codex local/self-hosted adapter.
-- Cursor external-provider adapter where its supported authentication model fits CAI policy.
-- Additional agents through a stable adapter contract.
-- ACP compatibility assessment for local agent sessions.
+- Additional approved OpenCode provider paths where their supported authentication model fits CAI policy.
+- Codex, Cursor, and other agent runtimes through a stable CAI task-adapter contract.
+- ACP compatibility assessment for local agent sessions after the OpenCode non-interactive contract is proven.
 
 ## Explicitly deferred
 
