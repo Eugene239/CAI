@@ -14,7 +14,7 @@ CAI is not a model provider, an IDE, or a replacement for GitHub. GitHub remains
 - **Isolated execution:** every task runs in an ephemeral, policy-bound environment.
 - **Ready-for-review PR by default:** agents may prepare work; humans retain merge and deployment authority.
 - **Evidence before claims:** CAI records task, changed-file, delivery, agent-event, and policy evidence for every run; repository-native CI independently owns build/test results and their logs.
-- **Runtime evaluation:** OpenCode is being evaluated as a unified subscription-backed agent runtime; CAI retains provider policy, credential isolation, containment, evidence, and pull-request delivery.
+- **ACP-native integration:** CAI uses a small Rust ACP client to launch approved native coding-agent CLIs while retaining provider policy, credential isolation, containment, evidence, and pull-request delivery.
 - **Dogfood in the open:** CAI is built and used through its own GitHub workflow.
 
 ## Initial scope
@@ -50,7 +50,7 @@ The initial release does not merge pull requests, deploy software, force-push br
 
 ## Status
 
-The deterministic `mock` provider proof is implemented: a Rust policy-resolution and mock-run CLI, immutable released binary, thin TypeScript Action wrapper, manual plan-only workflow, and authorized `cai` label trigger produce retained evidence without repository writes. OpenCode is under evaluation as a unified multi-provider runtime for CAI. It is not adopted until a controlled proof validates supported, terms-compliant subscription authentication for AGY, ChatGPT/Codex, Cursor, and Claude; API-key substitution and community authentication workarounds do not satisfy that gate. CAI continues to own host-held session policy, round-robin slot selection, and signed encrypted task envelopes delivered through GitHub Actions to a tenant's trusted executor pool; see [OpenCode runtime evaluation](docs/opencode-runtime.md) and [Provider sessions and executor pools](docs/provider-sessions.md).
+The deterministic `mock` provider proof is implemented: a Rust policy-resolution and mock-run CLI, immutable released binary, thin TypeScript Action wrapper, manual plan-only workflow, and authorized `cai` label trigger produce retained evidence without repository writes. The accepted coding-agent boundary is a small Rust ACP client that launches approved native subscription-capable CLIs. Codex, Claude Code, and Cursor are intended ACP paths; AGY requires a pinned and independently reviewed third-party ACP bridge before receiving subscription material. CAI continues to own host-held session policy, round-robin slot selection, and signed encrypted task envelopes delivered through GitHub Actions to a tenant's trusted executor pool; see [ACP agent boundary](docs/acp-agent-boundary.md) and [Provider sessions and executor pools](docs/provider-sessions.md).
 
 ## License
 

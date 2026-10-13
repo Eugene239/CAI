@@ -24,12 +24,13 @@
 - Run a plan-only deterministic mock task on a GitHub-hosted runner.
 - Prove OIDC token exchange, final usage comment, and run artifact.
 
-## Phase 2 — OpenCode subscription-compatibility gate and provider sessions
+## Phase 2 — ACP agent boundary and provider sessions
 
-- OpenCode subscription-compatibility gate: prove a documented, terms-compliant subscription authentication flow for AGY, ChatGPT/Codex, Cursor, and Claude; reject API-key substitution, community authentication plugins, and credential extraction as evidence.
-- Only if the gate passes, run an OpenCode executor spike: pin and verify the runtime distribution, run its documented non-interactive interface in a disposable scoped workspace, and collect structured completion and changed-file evidence.
-- Initial CAI task proof with one approved supported subscription-backed provider/model; no undocumented OAuth/session flow, unofficial subscription plugin, API-key substitution, or silent provider/model/slot fallback.
-- OpenCode task-adapter containment proof: private per-task credential state, cleanup, process-tree cancellation, deadline enforcement, and no GitHub write authority in the task container.
+- Implement the small Rust ACP client boundary: initialize, authentication negotiation, session creation, prompt, streamed updates, permission response, cancellation, and terminal result handling over stdio.
+- Initial Codex ACP spike with a supported ChatGPT subscription path in a disposable scoped workspace; pin and verify the CLI and ACP adapter, and collect structured completion and changed-file evidence.
+- Add Claude Code and Cursor only after their own supported subscription login, refresh, expiry/quota, materialization, cleanup, and non-interactive execution proofs.
+- Add AGY only through a pinned, integrity-verified, independently reviewed third-party ACP bridge; do not give an unreviewed bridge subscription material.
+- ACP task-adapter containment proof: private per-task credential state, cleanup, process-tree cancellation, deadline enforcement, no GitHub write authority in the task container, and no silent agent/provider/model/slot fallback.
 - Subscription-session adapter contract and deterministic mock usage reporting after a provider-specific supported authentication flow is accepted.
 - Host-held provider session vault, atomic session leases, and round-robin slot selection.
 - Signed encrypted task envelopes dispatched through GitHub Actions to any eligible executor in a tenant-scoped pool.
@@ -46,11 +47,10 @@
 - Minimal web control panel for organizations, repositories, runners, policies, provider connections, and run history.
 - Streamable HTTP MCP server with OAuth for CAI tools and run inspection.
 
-## Phase 4 — Additional agent runtimes and provider paths
+## Phase 4 — Additional ACP agents and provider paths
 
-- Additional approved OpenCode provider paths where their supported authentication model fits CAI policy.
-- Codex, Cursor, and other agent runtimes through a stable CAI task-adapter contract.
-- ACP compatibility assessment for local agent sessions after the OpenCode non-interactive contract is proven.
+- Additional approved native agents through the stable ACP boundary.
+- Non-ACP native adapters only where a provider has no supported ACP implementation and a separately approved structured non-interactive contract.
 
 ## Explicitly deferred
 
