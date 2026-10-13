@@ -24,9 +24,14 @@
 - Run a plan-only deterministic mock task on a GitHub-hosted runner.
 - Prove OIDC token exchange, final usage comment, and run artifact.
 
-## Phase 2 — Subscription sessions and first provider
+## Phase 2 — ACP agent boundary and provider sessions
 
-- Subscription-session adapter contract and deterministic mock usage reporting.
+- Implement the small Rust ACP client boundary: initialize, authentication negotiation, session creation, prompt, streamed updates, permission response, cancellation, and terminal result handling over stdio.
+- Initial Codex ACP spike with a supported ChatGPT subscription path in a disposable scoped workspace; pin and verify the CLI and ACP adapter, and collect structured completion and changed-file evidence.
+- Add Claude Code and Cursor only after their own supported subscription login, refresh, expiry/quota, materialization, cleanup, and non-interactive execution proofs.
+- Add AGY only through a pinned, integrity-verified, independently reviewed third-party ACP bridge; do not give an unreviewed bridge subscription material.
+- ACP task-adapter containment proof: private per-task credential state, cleanup, process-tree cancellation, deadline enforcement, no GitHub write authority in the task container, and no silent agent/provider/model/slot fallback.
+- Subscription-session adapter contract and deterministic mock usage reporting after a provider-specific supported authentication flow is accepted.
 - Host-held provider session vault, atomic session leases, and round-robin slot selection.
 - Signed encrypted task envelopes dispatched through GitHub Actions to any eligible executor in a tenant-scoped pool.
 - Per-task tmpfs session materialization, encrypted result return, and validated refresh-state handback.
@@ -42,12 +47,10 @@
 - Minimal web control panel for organizations, repositories, runners, policies, provider connections, and run history.
 - Streamable HTTP MCP server with OAuth for CAI tools and run inspection.
 
-## Phase 4 — Additional provider adapters
+## Phase 4 — Additional ACP agents and provider paths
 
-- Codex local/self-hosted adapter.
-- Cursor external-provider adapter where its supported authentication model fits CAI policy.
-- Additional agents through a stable adapter contract.
-- ACP compatibility assessment for local agent sessions.
+- Additional approved native agents through the stable ACP boundary.
+- Non-ACP native adapters only where a provider has no supported ACP implementation and a separately approved structured non-interactive contract.
 
 ## Explicitly deferred
 
