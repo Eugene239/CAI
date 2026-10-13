@@ -27,7 +27,7 @@
 ## Phase 2 — OpenCode runtime proof and provider sessions
 
 - OpenCode executor spike: pin and verify the runtime distribution, run its documented non-interactive interface in a disposable scoped workspace, and collect structured completion and changed-file evidence.
-- First real task proof with one approved API-key-backed provider/model; no OAuth, subscription-session flow, unofficial subscription plugin, or silent provider/model/slot fallback.
+- Initial CAI task proof with one approved API-key-backed provider/model; no OAuth, subscription-session flow, unofficial subscription plugin, or silent provider/model/slot fallback.
 - OpenCode task-adapter containment proof: private per-task credential state, cleanup, process-tree cancellation, deadline enforcement, and no GitHub write authority in the task container.
 - Subscription-session adapter contract and deterministic mock usage reporting after a provider-specific supported authentication flow is accepted.
 - Host-held provider session vault, atomic session leases, and round-robin slot selection.
