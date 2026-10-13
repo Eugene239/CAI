@@ -24,10 +24,11 @@
 - Run a plan-only deterministic mock task on a GitHub-hosted runner.
 - Prove OIDC token exchange, final usage comment, and run artifact.
 
-## Phase 2 — OpenCode runtime proof and provider sessions
+## Phase 2 — OpenCode subscription-compatibility gate and provider sessions
 
-- OpenCode executor spike: pin and verify the runtime distribution, run its documented non-interactive interface in a disposable scoped workspace, and collect structured completion and changed-file evidence.
-- Initial CAI task proof with one approved API-key-backed provider/model; no OAuth, subscription-session flow, unofficial subscription plugin, or silent provider/model/slot fallback.
+- OpenCode subscription-compatibility gate: prove a documented, terms-compliant subscription authentication flow for AGY, ChatGPT/Codex, Cursor, and Claude; reject API-key substitution, community authentication plugins, and credential extraction as evidence.
+- Only if the gate passes, run an OpenCode executor spike: pin and verify the runtime distribution, run its documented non-interactive interface in a disposable scoped workspace, and collect structured completion and changed-file evidence.
+- Initial CAI task proof with one approved supported subscription-backed provider/model; no undocumented OAuth/session flow, unofficial subscription plugin, API-key substitution, or silent provider/model/slot fallback.
 - OpenCode task-adapter containment proof: private per-task credential state, cleanup, process-tree cancellation, deadline enforcement, and no GitHub write authority in the task container.
 - Subscription-session adapter contract and deterministic mock usage reporting after a provider-specific supported authentication flow is accepted.
 - Host-held provider session vault, atomic session leases, and round-robin slot selection.
