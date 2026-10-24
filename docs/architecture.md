@@ -8,11 +8,25 @@ CAI is an open-source, GitHub-native harness for AI coding agents. GitHub is the
 
 The core harness and `cai` CLI are Rust binaries. Rust provides a portable, resource-efficient, memory-safe executable for GitHub Actions and self-hosted runners. The local control-plane HTTP boundary uses Axum on Tokio. A TypeScript wrapper may provide the GitHub Action interface where JavaScript action tooling is required.
 
-CAI is not a sandbox runtime: GitHub Actions and the task container remain the MVP execution boundary. The Rust core orchestrates policy enforcement, provider adapters, process lifecycle, evidence collection, and GitHub-facing outputs.
+CAI is not a sandbox runtime: GitHub Actions and the task container remain the MVP execution boundary. The Rust core orchestrates policy enforcement, a small ACP client, process lifecycle, evidence collection, and GitHub-facing outputs. ACP is the accepted primary coding-agent integration boundary; it standardizes lifecycle communication with native agent CLIs without taking ownership of CAI policy or delivery. See [ACP agent boundary](acp-agent-boundary.md).
 
 ## Local deployment state
 
 The first CAI deployment is Docker Compose with a local SQLite database in a named Docker volume. SQLite records installations, connected repositories, bootstrap state, run ledger records, and OIDC replay-protection data. The first POC has no PostgreSQL, Redis, or automated backup.
+
+## GitHub event ingress
+
+CAI receives GitHub App webhook deliveries at the control-plane HTTP boundary. Ingress verifies the signature and delivery identifier before parsing an accepted payload, records idempotency durably, and admits only an explicit allowlist of event types and actions. It maps each delivery to a known installation and connected repository, rejects unknown or unsupported input, and normalizes accepted data into a versioned internal CAI event record.
+
+A policy filter evaluates the normalized event before it can request work: only authorized CAI labels and exact CAI command forms may create a candidate run. The filter emits an approved internal handoff to the control-plane dispatcher or a recorded rejection; it does not execute an agent task, choose a runner, or grant repository write authority. Downstream consumers receive the normalized event rather than an unverified GitHub payload.
+
+```text
+GitHub delivery
+  -> signature, idempotency, installation, repository, type/action checks
+  -> versioned internal CAI event record
+  -> command/label authorization and policy filter
+  -> approved control-plane handoff or recorded rejection
+```
 
 ## MVP task scope
 
@@ -61,9 +75,11 @@ One local `cai.yaml` file in the CAI deployment holds global defaults and reposi
 - The resolved provider, model, adapter version, task revision, policy snapshot, and policy hash are recorded in the run evidence.
 - Policy is enforced by the workflow and harness, not delegated to the agent prompt.
 
-## Provider adapters
+## Coding-agent runtime and provider adapters
 
-Provider adapters implement a common CAI run contract. An adapter owns provider-specific invocation, streamed events, cancellation, authentication handoff, and normalized output. It does not own GitHub authorization or repository policy. The CAI host holds provider session state and creates a minimal encrypted per-task session bundle for a trusted executor; it never transfers plaintext provider credentials through GitHub workflow inputs, logs, outputs, caches, or artifacts. See [Provider sessions and executor pools](provider-sessions.md).
+CAI uses a small Rust Agent Client Protocol (ACP) client as its primary coding-agent integration boundary. It launches approved native agent CLIs in the task container, performs the session lifecycle over stdio, and returns normalized completion, event, and changed-file evidence. Native agents own their coding loops and supported subscription authentication semantics; CAI does not rebuild those loops or provider-specific tool-event protocols.
+
+CAI retains agent/provider/model/credential-slot selection, authorization, task admission, credential isolation, timeout, cancellation, diff validation, and GitHub delivery. It supplies an immutable approved selection and the ACP client must fail closed rather than silently selecting a different agent, provider, model, or session slot. The initial ACP spike uses one approved, supported subscription-backed agent/provider/model in a disposable task; each additional provider path requires its own authentication proof. Codex, Claude Code, and Cursor are intended ACP paths. AGY requires a pinned and independently reviewed third-party ACP bridge before it receives subscription material. The CAI host holds long-lived provider state and creates a minimal encrypted per-task session bundle for a trusted executor when such a flow is approved. It never transfers plaintext provider credentials through GitHub workflow inputs, logs, outputs, caches, or artifacts. See [ACP agent boundary](acp-agent-boundary.md) and [Provider sessions and executor pools](provider-sessions.md).
 
 The first implementation validates this contract with a deterministic mock adapter. It does not require an external provider connection. The mock reports fixed token counters and a controlled quota-exhausted outcome. The first end-to-end proof is a plan-only run; later enabled repositories may create ready-for-review pull requests.
 
