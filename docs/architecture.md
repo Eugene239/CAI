@@ -14,6 +14,20 @@ CAI is not a sandbox runtime: GitHub Actions and the task container remain the M
 
 The first CAI deployment is Docker Compose with a local SQLite database in a named Docker volume. SQLite records installations, connected repositories, bootstrap state, run ledger records, and OIDC replay-protection data. The first POC has no PostgreSQL, Redis, or automated backup.
 
+## GitHub event ingress
+
+CAI receives GitHub App webhook deliveries at the control-plane HTTP boundary. Ingress verifies the signature and delivery identifier before parsing an accepted payload, records idempotency durably, and admits only an explicit allowlist of event types and actions. It maps each delivery to a known installation and connected repository, rejects unknown or unsupported input, and normalizes accepted data into a versioned internal CAI event record.
+
+A policy filter evaluates the normalized event before it can request work: only authorized CAI labels and exact CAI command forms may create a candidate run. The filter emits an approved internal handoff to the control-plane dispatcher or a recorded rejection; it does not execute an agent task, choose a runner, or grant repository write authority. Downstream consumers receive the normalized event rather than an unverified GitHub payload.
+
+```text
+GitHub delivery
+  -> signature, idempotency, installation, repository, type/action checks
+  -> versioned internal CAI event record
+  -> command/label authorization and policy filter
+  -> approved control-plane handoff or recorded rejection
+```
+
 ## MVP task scope
 
 The MVP write-capable provider task is intentionally **pull-request creation only**. A provider task may inspect and edit its scoped workspace, produce a diff, and return evidence needed for CAI delivery. It does not run repository build, test, lint, packaging, or deployment commands, and MVP task images need only the provider runtime, CAI runtime, Git, and basic workspace tools—not project SDK matrices such as Rust, JDK/Gradle, or Android SDK.

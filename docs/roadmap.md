@@ -8,9 +8,11 @@
 - Threat model and repository policy schema drafted.
 - Apache-2.0 license, Cargo workspace baseline, Action-wrapper contract, and TDD baseline selected.
 
-## Phase 1 — GitHub and runner control plane
+## Phase 1 — GitHub event ingress and runner control plane
 
 - GitHub App webhook verification and idempotency.
+- Signed GitHub event ingress: accept only configured event types, verify the delivery before parsing its payload, deduplicate the delivery identifier durably, and normalize accepted events into a versioned internal event record.
+- Event policy filter and handoff: bind each accepted event to its installation and connected repository, reject unrecognized repositories and unsupported actions, authorize CAI labels and commands, and forward only an approved normalized event to the control-plane run dispatcher. Event ingress does not execute agent tasks or select runners.
 - OAuth login and repository onboarding.
 - GitHub App installation lifecycle or self-hosted App manifest onboarding.
 - SQLite state in a named Docker volume; no PostgreSQL, Redis, or automated backup in the first POC.
