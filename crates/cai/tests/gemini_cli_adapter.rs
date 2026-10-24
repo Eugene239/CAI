@@ -1,22 +1,46 @@
 #![cfg(unix)]
 
-use std::{fs, os::unix::fs::PermissionsExt, process::Command, time::Duration};
+use std::{
+    fs::{self, File},
+    io::Write,
+    os::unix::fs::PermissionsExt,
+    process::Command,
+    sync::atomic::{AtomicU64, Ordering},
+    time::Duration,
+};
 
 use cai::providers::{GeminiCli, GeminiOutcome, GeminiRequest};
 
+static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
+
 fn fixture(name: &str, body: &str) -> std::path::PathBuf {
-    let path = std::env::temp_dir().join(format!(
-        "cai-gemini-fixture-{name}-{}-{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("clock after epoch")
-            .as_nanos()
-    ));
-    fs::write(&path, format!("#!/bin/sh\nset -eu\n{body}\n")).expect("write fixture");
-    let mut permissions = fs::metadata(&path).expect("fixture metadata").permissions();
+    let sequence = NEXT_FIXTURE.fetch_add(1, Ordering::Relaxed);
+    let path = std::env::current_dir()
+        .expect("current directory")
+        .join("target")
+        .join("cai-gemini-fixtures")
+        .join(format!(
+            "cai-gemini-fixture-{name}-{}-{}-{sequence}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("clock after epoch")
+                .as_nanos()
+        ));
+    fs::create_dir_all(path.parent().expect("fixture parent")).expect("create fixture directory");
+    let staging_path = path.with_extension("source");
+    let mut source = File::create(&staging_path).expect("create fixture source");
+    source
+        .write_all(format!("#!/bin/sh\nset -eu\n{body}\n").as_bytes())
+        .expect("write fixture source");
+    source.sync_all().expect("sync fixture source");
+    drop(source);
+    let mut permissions = fs::metadata(&staging_path)
+        .expect("fixture metadata")
+        .permissions();
     permissions.set_mode(0o700);
-    fs::set_permissions(&path, permissions).expect("make fixture executable");
+    fs::set_permissions(&staging_path, permissions).expect("make fixture executable");
+    fs::rename(&staging_path, &path).expect("publish fixture");
     path
 }
 
