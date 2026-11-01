@@ -1,8 +1,24 @@
 #![cfg(unix)]
 
-use std::{fs, os::unix::fs::PermissionsExt, process::Command, time::Duration};
+use std::{
+    fs,
+    os::unix::fs::PermissionsExt,
+    process::Command,
+    sync::{Mutex, MutexGuard},
+    time::Duration,
+};
 
 use cai::providers::{GeminiCli, GeminiOutcome, GeminiRequest};
+
+// Writing an executable fixture while another test thread forks can leak the
+// write descriptor into that child and fail exec with ETXTBSY; serialize them.
+static SERIAL: Mutex<()> = Mutex::new(());
+
+fn serial() -> MutexGuard<'static, ()> {
+    SERIAL
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
 
 fn fixture(name: &str, body: &str) -> std::path::PathBuf {
     let path = std::env::temp_dir().join(format!(
@@ -22,6 +38,7 @@ fn fixture(name: &str, body: &str) -> std::path::PathBuf {
 
 #[test]
 fn gemini_headless_ping_invokes_native_cli_and_normalizes_json_output() {
+    let _serial = serial();
     let binary = fixture(
         "ping",
         r#"
@@ -52,6 +69,7 @@ printf '%s\n' '{"response":"CAI_PONG","stats":{"inputTokens":1,"outputTokens":1}
 
 #[test]
 fn cai_ping_command_completes_a_gemini_ping_pong_over_the_native_cli_contract() {
+    let _serial = serial();
     let binary = fixture(
         "cli-ping",
         r#"
@@ -91,6 +109,7 @@ printf '%s\n' '{"response":"CAI_PONG","stats":{}}'
 
 #[test]
 fn gemini_headless_input_error_is_classified_without_parsing_a_result() {
+    let _serial = serial();
     let binary = fixture("input-error", "exit 42");
 
     let run = GeminiCli::new(&binary)
@@ -108,6 +127,7 @@ fn gemini_headless_input_error_is_classified_without_parsing_a_result() {
 
 #[test]
 fn gemini_headless_rate_limit_is_returned_as_http_429() {
+    let _serial = serial();
     let binary = fixture(
         "rate-limit",
         "printf '%s\\n' 'retry diagnostic: {\"error\":{\"code\":429,\"status\":\"RESOURCE_EXHAUSTED\"}}'; exit 1",
@@ -128,6 +148,7 @@ fn gemini_headless_rate_limit_is_returned_as_http_429() {
 
 #[test]
 fn gemini_headless_timeout_kills_a_stalled_cli() {
+    let _serial = serial();
     let binary = fixture("timeout", "exec sleep 1");
 
     let run = GeminiCli::new(&binary)
@@ -147,6 +168,7 @@ fn gemini_headless_timeout_kills_a_stalled_cli() {
 
 #[test]
 fn gemini_headless_success_with_invalid_json_fails_closed() {
+    let _serial = serial();
     let binary = fixture("invalid-json", "printf '%s\\n' 'not-json'");
 
     let error = GeminiCli::new(&binary)
