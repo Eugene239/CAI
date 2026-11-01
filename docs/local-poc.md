@@ -10,11 +10,11 @@ Local CAI host
 └─ cai-state: SQLite state
 ```
 
-SQLite is the only persistent store in the first POC. SQLite records App installations, connected repositories, bootstrap state, run ledger records, and OIDC replay-protection data. There is no PostgreSQL, Redis, or automated backup in the first POC.
+SQLite is the only persistent store in the first POC. SQLite records App installations, connected repositories, bootstrap state, run ledger records, GitHub polling cursors, and processed-event records. There is no PostgreSQL, Redis, or automated backup in the first POC.
 
 ## Current SQLite run ledger
 
-The Rust core opens a SQLite database through `rusqlite` with a bundled SQLite build, so the first POC does not depend on an operating-system SQLite package. The implemented `runs` table persists run ID, repository, outcome, execution mode, provider/model, token counters, quota state, and policy SHA-256. It deliberately does not persist the full policy snapshot or any credential material. Installation, repository, bootstrap, and OIDC replay records are not implemented yet.
+The Rust core opens a SQLite database through `rusqlite` with a bundled SQLite build, so the first POC does not depend on an operating-system SQLite package. The implemented `runs` table persists run ID, repository, outcome, execution mode, provider/model, token counters, quota state, and policy SHA-256. It deliberately does not persist the full policy snapshot or any credential material. Installation, repository, bootstrap, and polling records are not implemented yet.
 
 ## Secrets
 
@@ -28,7 +28,7 @@ The initial Axum router implements `GET /health` as a stateless, credential-free
 cai serve --listen 127.0.0.1:8080
 ```
 
-It writes one JSON document with the bound listener address, then serves until stopped. GitHub integration and executor dispatch use outbound GitHub API calls. The local CAI machine does not need a public listener, public IP address, inbound port forwarding, or a direct network connection to an executor runner.
+It writes one JSON document with the bound listener address, then serves until stopped. GitHub integration uses outbound GitHub API calls only: CAI polls for labels, commands, and encrypted executor results, dispatches executor tasks, and delivers pull requests itself. The local CAI machine does not need a public listener, public IP address, inbound port forwarding, or a direct network connection to an executor runner.
 
 ## First vertical proof
 

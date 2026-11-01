@@ -12,17 +12,17 @@ CAI is not a sandbox runtime: GitHub Actions and the task container remain the M
 
 ## Local deployment state
 
-The first CAI deployment is Docker Compose with a local SQLite database in a named Docker volume. SQLite records installations, connected repositories, bootstrap state, run ledger records, and OIDC replay-protection data. The first POC has no PostgreSQL, Redis, or automated backup.
+The first CAI deployment is Docker Compose with a local SQLite database in a named Docker volume. SQLite records installations, connected repositories, bootstrap state, run ledger records, GitHub polling cursors, processed-event records, and executor admission records. The first POC has no PostgreSQL, Redis, or automated backup.
 
 ## GitHub event ingress
 
-CAI receives GitHub App webhook deliveries at the control-plane HTTP boundary. Ingress verifies the signature and delivery identifier before parsing an accepted payload, records idempotency durably, and admits only an explicit allowlist of event types and actions. It maps each delivery to a known installation and connected repository, rejects unknown or unsupported input, and normalizes accepted data into a versioned internal CAI event record.
+The first CAI host has no inbound GitHub listener. It polls the GitHub API outbound, with App installation credentials, for issue events and issue comments in each connected repository. Polling uses durable per-repository cursors and conditional requests, records every processed event or comment identifier durably for idempotency, and admits only an explicit allowlist of event types and actions: a label added to an issue or pull request, and a newly created issue or pull-request comment. CAI supports two ingress modes that produce the same versioned internal event record: polling, implemented first, and webhook delivery, planned next. An operator selects the mode per deployment. Webhook ingress must verify the signature and delivery identifier before parsing and must share the polling mode's durable idempotency records, so switching modes or running both never processes an event twice. Ingress maps each event to a known installation and connected repository, rejects unknown or unsupported input, and normalizes accepted data into a versioned internal CAI event record.
 
 A policy filter evaluates the normalized event before it can request work: only authorized CAI labels and exact CAI command forms may create a candidate run. The filter emits an approved internal handoff to the control-plane dispatcher or a recorded rejection; it does not execute an agent task, choose a runner, or grant repository write authority. Downstream consumers receive the normalized event rather than an unverified GitHub payload.
 
 ```text
-GitHub delivery
-  -> signature, idempotency, installation, repository, type/action checks
+GitHub API poll
+  -> idempotency, installation, repository, type/action checks
   -> versioned internal CAI event record
   -> command/label authorization and policy filter
   -> approved control-plane handoff or recorded rejection
@@ -48,13 +48,14 @@ The repository owner controls eligible self-hosted runners and runner groups in 
 The CAI Action creates one task container on the selected GitHub runner. The CAI deployment never executes task code itself. A task container receives only a per-run writable workspace and temporary directory: it must not receive host-home mounts, a Docker socket, SSH agent, host credentials, or arbitrary bind mounts. A task has a 60-minute wall-clock limit by default; repository policy may lower that limit. Resource limits and outbound-network policy are not standardized in the MVP.
 
 ```text
-GitHub issue or pull request event in a connected repository
-  -> CAI workflow trigger in that repository
-  -> workflow policy resolution
-  -> clean task container
+CAI label or command observed by CAI host polling
+  -> policy resolution, slot lease, signed encrypted task envelope
+  -> repository_dispatch to the CAI executor workflow
+  -> clean task container on a GitHub-selected executor
   -> provider adapter and agent process
-  -> evidence collection
-  -> ready-for-review pull request and final GitHub comment
+  -> encrypted result artifact
+  -> CAI host polls, decrypts, and validates the result
+  -> host-side ready-for-review pull request and final GitHub comment
 ```
 
 ## Invocation
@@ -91,7 +92,7 @@ Each completed or failed run posts one final comment to its source issue or pull
 
 Artifacts and workflow logs are retained for seven days by default. Repository policy may reduce retention to one through six days.
 
-The task container never receives a GitHub write token. After it exits, the CAI Action validates the result and performs branch, commit, and ready-for-review pull-request delivery outside the container with the per-run App installation token.
+The task container never receives a GitHub write token. After the executor uploads its encrypted result, the CAI host retrieves it by polling, decrypts it, validates the diff against the task scope, and performs branch, commit, and ready-for-review pull-request delivery itself with a fresh App installation token. Pull requests created with the App identity trigger repository-native CI, which a workflow `GITHUB_TOKEN` would not.
 
 For an issue, CAI creates `cai/<issue-number>` from the current default branch. If an open CAI pull request already exists for that issue, CAI continues from its exact head and updates that same pull request. For an existing pull request, CAI may push only to a writable head branch in the same repository, never a fork, and refuses delivery if that head SHA changed after checkout.
 
@@ -114,6 +115,6 @@ A later review design must establish and validate all of the following before it
 - A task container may access only its scoped workspace and temporary directory.
 - Provider credentials must not be committed to repositories or included in logs or artifacts. A provider session may be materialized only in a dedicated executor's private per-task tmpfs directory.
 - GitHub App installation tokens, `GITHUB_TOKEN`, OAuth access tokens, and private keys must not be passed as command-line arguments, workflow outputs, or artifact content.
-- The CAI Action receives an App installation token only through a GitHub OIDC exchange with the CAI deployment. The exchange accepts only the exact connected repository, generated workflow, default branch, valid run ID, and current App installation scope.
+- Only the CAI host holds GitHub write authority. It mints a fresh App installation token for each privileged operation, scoped to the one repository. Runners, executors, workflow steps, and task containers receive no App installation token; a CAI workflow's `GITHUB_TOKEN` is limited to read access and artifact upload.
 - A reviewer must not write repository contents, push commits, create branches, or merge pull requests.
 - GitHub review identity, task identity, provider identity, and runner identity are separate concepts and must remain traceable in run evidence.
