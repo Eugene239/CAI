@@ -16,7 +16,7 @@ The first CAI deployment is Docker Compose with a local SQLite database in a nam
 
 ## GitHub event ingress
 
-CAI receives GitHub App webhook deliveries at the control-plane HTTP boundary. Ingress verifies the signature and delivery identifier before parsing an accepted payload, records idempotency durably, and admits only an explicit allowlist of event types and actions. It maps each delivery to a known installation and connected repository, rejects unknown or unsupported input, and normalizes accepted data into a versioned internal CAI event record.
+CAI receives GitHub App webhook deliveries at the control-plane HTTP boundary. Ingress verifies the signature and delivery identifier before parsing an accepted payload, records idempotency durably, and admits only an explicit allowlist of event types and actions. It maps each delivery to a known installation and connected repository, rejects unknown or unsupported input, and normalizes accepted data into a versioned internal CAI event record. A local deployment receives deliveries through an operator-run tunnel to its loopback listener; see [Local deployment](local-poc.md#tunneled-github-endpoints).
 
 A policy filter evaluates the normalized event before it can request work: only authorized CAI labels and exact CAI command forms may create a candidate run. The filter emits an approved internal handoff to the control-plane dispatcher or a recorded rejection; it does not execute an agent task, choose a runner, or grant repository write authority. Downstream consumers receive the normalized event rather than an unverified GitHub payload.
 

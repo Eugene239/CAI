@@ -32,6 +32,7 @@ The initial test baseline is `cargo test` for Rust and `node --test` for the Typ
 ## First local POC
 
 - The first deployment is a local CAI host with SQLite state. It reaches GitHub through outbound API calls; it does not require a public listener, tunnel, or inbound port forwarding for executor dispatch.
+- The CAI listener binds to loopback only. GitHub App webhook deliveries and the Actions OIDC token exchange reach it through an operator-run tunnel that exposes only `POST /github/webhook` and `POST /github/oidc/token`. Treat every tunneled request as untrusted internet input: verify the webhook signature before parsing, and verify OIDC tokens against GitHub's published keys before acting on any claim.
 - Compose secrets, when Compose is used, are mounted read-only. Do not use environment variables, command lines, logs, artifacts, or SQLite for credentials.
 - The first vertical proof runs plan-only on `Eugene239/CAI` with the deterministic mock provider. It must not create a code change or pull request.
 

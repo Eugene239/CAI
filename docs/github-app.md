@@ -48,8 +48,12 @@ Installation tokens, `GITHUB_TOKEN`, OAuth access tokens, provider credentials, 
 
 ## Actions OIDC exchange
 
-The generated workflow does not receive a stored App private key or a repository secret containing an installation token. It requests a GitHub OIDC token and sends it to the CAI deployment's token-exchange endpoint.
+The generated workflow does not receive a stored App private key or a repository secret containing an installation token. It requests a GitHub OIDC token and sends it to the CAI deployment's token-exchange endpoint, `POST /github/oidc/token`. For a local deployment that endpoint is reached through the operator-run tunnel described in [Local deployment](local-poc.md#tunneled-github-endpoints).
 
-CAI validates the token's repository, generated workflow, default-branch reference, GitHub run ID, and current App installation scope before minting a fresh installation token for that run. The task container never receives that token; only the delivery layer outside the container may use it.
+CAI validates the token's signature, issuer, audience, repository, generated workflow, default-branch reference, GitHub run ID, and current App installation scope before minting a fresh installation token for that run. It accepts each OIDC token once. The minted token is restricted to that one repository and to the contents and pull-request write permissions delivery needs. The task container never receives that token; only the delivery layer outside the container may use it.
+
+## Webhook ingress
+
+GitHub App webhook deliveries arrive at `POST /github/webhook`. CAI verifies `X-Hub-Signature-256` against the raw request body with the App webhook secret before parsing it, records the `X-GitHub-Delivery` identifier durably for idempotency, and admits only the configured event types and actions. Local deployments receive deliveries through the same operator-run tunnel as the token exchange.
 
 GitHub App installation and GitHub OAuth sign-in are distinct. Installation grants repository access; OAuth sign-in links a human account for management. Neither flow transfers provider OAuth sessions to GitHub.

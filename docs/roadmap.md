@@ -10,7 +10,7 @@
 
 ## Phase 1 — GitHub event ingress and runner control plane
 
-- GitHub App webhook verification and idempotency.
+- GitHub App webhook verification and idempotency, reached on a local host through an operator-run tunnel to the loopback listener.
 - Signed GitHub event ingress: accept only configured event types, verify the delivery before parsing its payload, deduplicate the delivery identifier durably, and normalize accepted events into a versioned internal event record.
 - Event policy filter and handoff: bind each accepted event to its installation and connected repository, reject unrecognized repositories and unsupported actions, authorize CAI labels and commands, and forward only an approved normalized event to the control-plane run dispatcher. Event ingress does not execute agent tasks or select runners.
 - OAuth login and repository onboarding.
