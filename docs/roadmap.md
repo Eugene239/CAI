@@ -10,8 +10,8 @@
 
 ## Phase 1 — GitHub event ingress and runner control plane
 
-- GitHub App webhook verification and idempotency, reached on a local host through an operator-run tunnel to the loopback listener.
-- Signed GitHub event ingress: accept only configured event types, verify the delivery before parsing its payload, deduplicate the delivery identifier durably, and normalize accepted events into a versioned internal event record.
+- Outbound GitHub event polling with durable cursors and idempotency; webhook ingress is deferred to managed integration.
+- Event ingress: accept only configured event types, deduplicate event identifiers durably, and normalize accepted events into a versioned internal event record.
 - Event policy filter and handoff: bind each accepted event to its installation and connected repository, reject unrecognized repositories and unsupported actions, authorize CAI labels and commands, and forward only an approved normalized event to the control-plane run dispatcher. Event ingress does not execute agent tasks or select runners.
 - OAuth login and repository onboarding.
 - GitHub App installation lifecycle or self-hosted App manifest onboarding.
@@ -24,7 +24,7 @@
 
 - Bootstrap `Eugene239/CAI` through the CAI App.
 - Run a plan-only deterministic mock task on a GitHub-hosted runner.
-- Prove OIDC token exchange, final usage comment, and run artifact.
+- Prove final usage comment and run artifact.
 
 ## Phase 2 — ACP agent boundary and provider sessions
 

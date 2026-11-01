@@ -7,11 +7,11 @@ CAI keeps these identities separate:
 | Identity | Purpose | Example actions |
 | --- | --- | --- |
 | Human user | Installs the App, confirms bootstrap, or starts work | Select repositories, merge bootstrap PR, add a CAI label |
-| GitHub App | Repository-scoped integration identity | Receive webhooks, create the bootstrap branch and pull request |
+| GitHub App | Repository-scoped integration identity | Read events by polling, create bootstrap and delivery branches and pull requests |
 | Executor pool | A tenant-scoped set of trusted self-hosted runners | GitHub selects an available runner for an encrypted CAI task |
 | Runner workload | Executes one isolated task | Fetch a repository revision, invoke an approved provider adapter |
 | Provider identity | Authorizes a model or coding-agent provider | Invoke Claude, Codex, Cursor, or another provider |
-| CAI deployment | Hosts the harness and GitHub App credentials | Verify webhooks, mint credentials, route a workflow run |
+| CAI deployment | Hosts the harness and GitHub App credentials | Poll GitHub events, mint credentials, dispatch encrypted tasks, deliver pull requests |
 
 ## Authentication principles
 
@@ -20,7 +20,7 @@ CAI keeps these identities separate:
 - Use OIDC or workload identity federation for runners and provider calls where supported.
 - Treat all credentials as short-lived and scoped to a single responsibility.
 - Never use a human personal access token as CAI's normal service credential.
-- The App private key and webhook secret remain in the CAI deployment's protected secret store, never in a connected repository.
+- The App private key and any webhook secret remain in the CAI deployment's protected secret store, never in a connected repository.
 - Provider-session vault keys, executor-fleet decryption capability, and CAI-host signing keys remain separate from GitHub App credentials.
 
 ## Installation scope and credentials
@@ -29,11 +29,11 @@ The installer, not CAI, chooses `All repositories` or `Only select repositories`
 
 For a privileged repository operation, CAI generates an App JWT and mints a fresh installation access token. It does not persist an installation token as a repository credential. If a user changes the installation's repository list, CAI must mint a fresh token and re-check scope before a privileged action.
 
-An Actions workflow obtains its installation token through a GitHub OIDC exchange with the CAI deployment. CAI validates the exact connected repository, generated workflow, default-branch reference, GitHub run ID, and installation scope. The task container never receives the token. For real provider work, a CAI host encrypts a task envelope to its own executor-fleet key; any selected runner in that tenant's dedicated pool may decrypt it only after validating the CAI signature and workflow binding. GitHub App installation access and human OAuth sign-in are distinct: installation authorizes repositories, while OAuth sign-in links a human account for management.
+No Actions workflow obtains an App installation token. The CAI host uses installation tokens itself for polling, dispatch, and pull-request delivery; runners and task containers never receive one. For real provider work, a CAI host encrypts a task envelope to its own executor-fleet key; any selected runner in that tenant's dedicated pool may decrypt it only after validating the CAI signature and workflow binding. GitHub App installation access and human OAuth sign-in are distinct: installation authorizes repositories, while OAuth sign-in links a human account for management.
 
 ## Authorization order
 
-1. Verify the GitHub webhook and deduplicate the event.
+1. Read the GitHub event through authenticated polling and deduplicate it.
 2. Resolve the GitHub App installation and repository.
 3. Confirm that the repository is in the current installation scope.
 4. Resolve the initiating user, when the trigger has a user.

@@ -32,7 +32,7 @@ The initial test baseline is `cargo test` for Rust and `node --test` for the Typ
 ## First local POC
 
 - The first deployment is a local CAI host with SQLite state. It reaches GitHub through outbound API calls; it does not require a public listener, tunnel, or inbound port forwarding for executor dispatch.
-- The CAI listener binds to loopback only. GitHub App webhook deliveries and the Actions OIDC token exchange reach it through an operator-run tunnel that exposes only `POST /github/webhook` and `POST /github/oidc/token`. Treat every tunneled request as untrusted internet input: verify the webhook signature before parsing, and verify OIDC tokens against GitHub's published keys before acting on any claim.
+- The first host has no inbound GitHub listener. It discovers CAI labels and commands, and retrieves encrypted executor results, by polling the GitHub API. Webhook ingress is deferred to managed integration.
 - Compose secrets, when Compose is used, are mounted read-only. Do not use environment variables, command lines, logs, artifacts, or SQLite for credentials.
 - The first vertical proof runs plan-only on `Eugene239/CAI` with the deterministic mock provider. It must not create a code change or pull request.
 
@@ -50,7 +50,7 @@ The initial test baseline is `cargo test` for Rust and `node --test` for the Typ
 - MVP write-capable tasks may edit their scoped workspace and produce a ready-for-review PR only. They do not run repository build, test, lint, packaging, or deployment commands, so MVP task images do not need project SDK/toolchain matrices. Repository-native GitHub CI and ordinary human review own validation.
 - A task container runs on the selected GitHub runner, not in the CAI deployment. It receives only a per-run workspace and temporary directory; do not mount host credentials, SSH agents, Docker sockets, home directories, or arbitrary host paths.
 - A real provider task is an opaque, CAI-signed envelope encrypted to the tenant executor-fleet key. GitHub selects any available runner in that tenant's dedicated pool; CAI must not select a physical runner or run a parallel queue. Executors materialize minimal provider session state only in private per-task tmpfs storage and return encrypted results to the CAI host.
-- A task container never receives a GitHub write token. The CAI Action delivers changes outside the container with a fresh App installation token issued through validated GitHub OIDC.
+- A task container never receives a GitHub write token. The CAI host delivers changes itself after decrypting and validating the executor result, with a fresh App installation token scoped to that repository. No runner, executor, or workflow step receives an App installation token.
 - CAI creates ready-for-review pull requests, not draft pull requests. It does not wait for, parse, retry, or fix repository-native CI.
 - Network and container resource policy are not standardized in the MVP.
 - A successful write-capable run creates or updates a ready-for-review pull request only. It must not merge, deploy, force-push, modify protected branches, or widen permissions.

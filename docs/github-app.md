@@ -13,12 +13,13 @@ The installer chooses `All repositories` or `Only select repositories` in GitHub
 | Permission | Access | MVP use |
 | --- | --- | --- |
 | Metadata | Read | Identify installations and repositories. |
-| Contents | Write | Create the bootstrap branch and commit the standard workflow. |
+| Contents | Write | Create the bootstrap branch, commit the standard workflow, send `repository_dispatch`, and push delivery branches. |
 | Workflows | Write | Add or update the workflow under `.github/workflows/`. |
 | Pull requests | Write | Open the normal, ready-for-review bootstrap pull request. |
-| Issues | Write | Post bootstrap and final run comments. |
+| Issues | Write | Poll issue events and comments; post bootstrap and final run comments. |
+| Actions | Read | Poll executor workflow runs and download encrypted result artifacts. |
 
-The MVP does not request Actions, Checks, Administration, or review-specific permissions. Users cancel runs through the native GitHub Actions UI. GitHub Actions creates its own workflow status and check output.
+The MVP does not request Actions write, Checks, Administration, or review-specific permissions. Users cancel runs through the native GitHub Actions UI. GitHub Actions creates its own workflow status and check output.
 
 ## Bootstrap contract
 
@@ -42,18 +43,14 @@ CAI supports two planned integration modes:
 - In **self-hosted integration**, the owner creates and installs a GitHub App for their CAI host. The host retains that App's private key and mints its own installation tokens.
 - In **managed integration**, a shared CAI App maps an installation to a tenant and relays opaque encrypted task dispatches. The shared integration service does not receive provider sessions, executor private keys, or plaintext task contents.
 
-In either mode, the GitHub App private key and webhook secret stay outside repositories, workflow files, and run artifacts. For each privileged operation, the App generates a JWT and mints a fresh installation access token scoped to the installation.
+In either mode, the GitHub App private key and, when webhooks are enabled, the webhook secret stay outside repositories, workflow files, and run artifacts. For each privileged operation, the App generates a JWT and mints a fresh installation access token scoped to the installation.
 
 Installation tokens, `GITHUB_TOKEN`, OAuth access tokens, provider credentials, and private keys must be redacted from logs and excluded from artifacts. They must not be passed through command-line arguments or workflow outputs.
 
-## Actions OIDC exchange
+## Event polling and pull-request delivery
 
-The generated workflow does not receive a stored App private key or a repository secret containing an installation token. It requests a GitHub OIDC token and sends it to the CAI deployment's token-exchange endpoint, `POST /github/oidc/token`. For a local deployment that endpoint is reached through the operator-run tunnel described in [Local deployment](local-poc.md#tunneled-github-endpoints).
+The self-hosted CAI host needs no inbound connectivity from GitHub. It polls issue events and comments for connected repositories with a fresh installation token, keeps durable cursors and processed-event records, and polls executor workflow runs for their encrypted result artifacts. Webhook ingress is deferred to managed integration.
 
-CAI validates the token's signature, issuer, audience, repository, generated workflow, default-branch reference, GitHub run ID, and current App installation scope before minting a fresh installation token for that run. It accepts each OIDC token once. The minted token is restricted to that one repository and to the contents and pull-request write permissions delivery needs. The task container never receives that token; only the delivery layer outside the container may use it.
-
-## Webhook ingress
-
-GitHub App webhook deliveries arrive at `POST /github/webhook`. CAI verifies `X-Hub-Signature-256` against the raw request body with the App webhook secret before parsing it, records the `X-GitHub-Delivery` identifier durably for idempotency, and admits only the configured event types and actions. Local deployments receive deliveries through the same operator-run tunnel as the token exchange.
+The generated workflows receive no App private key, no installation token, and no repository secret containing one. The CAI host delivers pull requests itself: it decrypts and validates the executor result, then creates or updates the delivery branch and the ready-for-review pull request with a fresh installation token restricted to that repository. Pull requests created by the App identity trigger repository-native CI.
 
 GitHub App installation and GitHub OAuth sign-in are distinct. Installation grants repository access; OAuth sign-in links a human account for management. Neither flow transfers provider OAuth sessions to GitHub.

@@ -10,11 +10,11 @@ Local CAI host
 └─ cai-state: SQLite state
 ```
 
-SQLite is the only persistent store in the first POC. SQLite records App installations, connected repositories, bootstrap state, run ledger records, and OIDC replay-protection data. There is no PostgreSQL, Redis, or automated backup in the first POC.
+SQLite is the only persistent store in the first POC. SQLite records App installations, connected repositories, bootstrap state, run ledger records, GitHub polling cursors, and processed-event records. There is no PostgreSQL, Redis, or automated backup in the first POC.
 
 ## Current SQLite run ledger
 
-The Rust core opens a SQLite database through `rusqlite` with a bundled SQLite build, so the first POC does not depend on an operating-system SQLite package. The implemented `runs` table persists run ID, repository, outcome, execution mode, provider/model, token counters, quota state, and policy SHA-256. It deliberately does not persist the full policy snapshot or any credential material. Installation, repository, bootstrap, and OIDC replay records are not implemented yet.
+The Rust core opens a SQLite database through `rusqlite` with a bundled SQLite build, so the first POC does not depend on an operating-system SQLite package. The implemented `runs` table persists run ID, repository, outcome, execution mode, provider/model, token counters, quota state, and policy SHA-256. It deliberately does not persist the full policy snapshot or any credential material. Installation, repository, bootstrap, and polling records are not implemented yet.
 
 ## Secrets
 
@@ -28,22 +28,7 @@ The initial Axum router implements `GET /health` as a stateless, credential-free
 cai serve --listen 127.0.0.1:8080
 ```
 
-It writes one JSON document with the bound listener address, then serves until stopped. Executor dispatch and other GitHub API work use outbound GitHub API calls. The local CAI machine does not need a public IP address, inbound port forwarding, or a direct network connection to an executor runner.
-
-## Tunneled GitHub endpoints
-
-Two inbound flows must reach the host from GitHub's network: GitHub App webhook deliveries and the Actions OIDC token exchange used by the CAI Action for pull-request delivery. The listener still binds to loopback only. The operator runs a tunnel that terminates on the local machine and forwards HTTPS to the loopback listener. CAI does not prescribe a tunnel product, and it does not require a public IP address or router port forwarding.
-
-The tunnel exposes exactly two routes:
-
-| Route | Caller | Authentication before any other processing |
-| --- | --- | --- |
-| `POST /github/webhook` | GitHub App webhook deliveries | `X-Hub-Signature-256` HMAC-SHA256 over the raw body with the App webhook secret, compared in constant time before the body is parsed; the delivery ID is then deduplicated durably |
-| `POST /github/oidc/token` | The CAI Action in a connected repository's generated workflow | A GitHub Actions OIDC JWT verified against GitHub's published signing keys, issuer, and the CAI audience; repository, workflow, default-branch ref, and run claims are checked and the token is recorded for replay protection |
-
-All other routes, including `GET /health`, stay local-only. Where the tunnel cannot restrict paths, CAI still serves no other route that grants data or authority without local access. Every tunneled request is untrusted internet input: oversized bodies, unknown events, and failed verification are rejected without side effects and without echoing request content.
-
-The tunnel changes reachability, not the trust model. Task containers and executors never call these endpoints, the tunnel never carries provider sessions or executor envelopes, and executor dispatch remains outbound through `repository_dispatch`.
+It writes one JSON document with the bound listener address, then serves until stopped. GitHub integration uses outbound GitHub API calls only: CAI polls for labels, commands, and encrypted executor results, dispatches executor tasks, and delivers pull requests itself. The local CAI machine does not need a public listener, public IP address, inbound port forwarding, or a direct network connection to an executor runner.
 
 ## First vertical proof
 
