@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted architecture decision. CAI uses a small Rust Agent Client Protocol (ACP) client as its primary coding-agent integration boundary. This document records the intended boundary; it does not claim that an ACP client, provider session flow, or GitHub executor workflow is implemented.
+Accepted architecture decision. CAI uses a small Rust Agent Client Protocol (ACP) client as its primary coding-agent integration boundary. The client is implemented and tested against local fixtures only. The required-evidence items below remain unproven for every real provider path, and no provider session flow or GitHub executor workflow is enabled by this status.
 
 ## Decision
 

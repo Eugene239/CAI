@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+pub mod acp;
 pub mod envelope;
 pub mod executor;
 pub mod ledger;
