@@ -1,7 +1,7 @@
 use std::{env, fs, io, net::SocketAddr, path::Path, process};
 
 use ed25519_dalek::{SigningKey, VerifyingKey};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use x25519_dalek::StaticSecret;
 
 #[derive(Serialize)]
@@ -46,6 +46,36 @@ struct ExecutorMockInputs<'a> {
     result_output: &'a str,
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AcpRunFile {
+    agent: String,
+    #[serde(default)]
+    args: Vec<String>,
+    workspace: String,
+    prompt_file: String,
+    timeout_seconds: u64,
+    #[serde(default = "default_cancel_grace")]
+    cancel_grace_seconds: u64,
+    auth_method: Option<String>,
+    #[serde(default)]
+    permission_policy: AcpPermissionPolicy,
+    #[serde(default)]
+    env: Vec<String>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+enum AcpPermissionPolicy {
+    #[default]
+    Reject,
+    AllowOnce,
+}
+
+fn default_cancel_grace() -> u64 {
+    5
+}
+
 #[tokio::main]
 async fn main() {
     if let Err(error) = run().await {
@@ -58,6 +88,11 @@ async fn run() -> Result<(), String> {
     let arguments: Vec<String> = env::args().skip(1).collect();
 
     match arguments.as_slice() {
+        [command, operation, flag_spec, spec_path]
+            if command == "acp" && operation == "run" && flag_spec == "--spec" =>
+        {
+            run_acp(spec_path)
+        }
         [
             command,
             operation,
@@ -332,6 +367,50 @@ fn run_executor_mock(inputs: ExecutorMockInputs<'_>) -> Result<(), String> {
     })
 }
 
+fn run_acp(path: &str) -> Result<(), String> {
+    let source = fs::read_to_string(path)
+        .map_err(|error| format!("could not read ACP run spec {path:?}: {error}"))?;
+    let file: AcpRunFile = serde_yaml::from_str(&source)
+        .map_err(|error| format!("invalid ACP run spec {path:?}: {error}"))?;
+    let prompt = fs::read_to_string(&file.prompt_file).map_err(|error| {
+        format!(
+            "could not read ACP prompt file {:?}: {error}",
+            file.prompt_file
+        )
+    })?;
+    let mut environment = Vec::with_capacity(file.env.len());
+    for name in file.env {
+        let value =
+            env::var(&name).map_err(|_| format!("ACP environment variable {name:?} is not set"))?;
+        environment.push((name, value));
+    }
+    let permission_policy = match file.permission_policy {
+        AcpPermissionPolicy::Reject => cai::acp::PermissionPolicy::Reject,
+        AcpPermissionPolicy::AllowOnce => cai::acp::PermissionPolicy::AllowOnce,
+    };
+    let run = cai::acp::AcpClient::run(
+        &cai::acp::AcpRunSpec {
+            agent: file.agent.into(),
+            args: file.args,
+            workspace: file.workspace.into(),
+            prompt,
+            timeout: std::time::Duration::from_secs(file.timeout_seconds),
+            cancel_grace: std::time::Duration::from_secs(file.cancel_grace_seconds),
+            approved_auth_method: file.auth_method,
+            permission_policy,
+            environment,
+        },
+        &std::sync::atomic::AtomicBool::new(false),
+    )
+    .map_err(|error| error.to_string())?;
+    write_json(&run)?;
+    if run.outcome == cai::acp::AcpOutcome::Completed {
+        Ok(())
+    } else {
+        Err(format!("ACP run did not complete: {:?}", run.outcome))
+    }
+}
+
 fn read_json<T: serde::de::DeserializeOwned>(path: &str, name: &str) -> Result<T, String> {
     let source =
         fs::read(path).map_err(|error| format!("could not read {name} {path:?}: {error}"))?;
@@ -372,5 +451,5 @@ fn write_json(value: &impl serde::Serialize) -> Result<(), String> {
 }
 
 fn usage() -> String {
-    "usage: cai policy resolve --config <cai.yaml> --repository <owner/repository>\n       cai mock plan --config <cai.yaml> --repository <owner/repository> [--quota-exhausted]\n       cai mock evidence --config <cai.yaml> --repository <owner/repository> --output-root <directory> --run-id <run-id>\n       cai mock run --config <cai.yaml> --repository <owner/repository> --output-root <directory> --state-db <database> --run-id <run-id>\n       cai executor mock --envelope <task.json> --fleet-secret <hex-file> --host-verify-key <hex-file> --executor-signing-key <hex-file> --tenant <tenant-id> --now <unix-seconds> --task-directory <tmpfs-directory> --result-output <result.json>\n       cai provider gemini ping --binary <gemini-cli> --workspace <directory>\n       cai serve --listen <loopback-address:port>".to_owned()
+    "usage: cai policy resolve --config <cai.yaml> --repository <owner/repository>\n       cai acp run --spec <acp-run.yaml>\n       cai mock plan --config <cai.yaml> --repository <owner/repository> [--quota-exhausted]\n       cai mock evidence --config <cai.yaml> --repository <owner/repository> --output-root <directory> --run-id <run-id>\n       cai mock run --config <cai.yaml> --repository <owner/repository> --output-root <directory> --state-db <database> --run-id <run-id>\n       cai executor mock --envelope <task.json> --fleet-secret <hex-file> --host-verify-key <hex-file> --executor-signing-key <hex-file> --tenant <tenant-id> --now <unix-seconds> --task-directory <tmpfs-directory> --result-output <result.json>\n       cai provider gemini ping --binary <gemini-cli> --workspace <directory>\n       cai serve --listen <loopback-address:port>".to_owned()
 }

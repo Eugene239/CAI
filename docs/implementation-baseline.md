@@ -53,6 +53,14 @@ The Rust core also has a deliberately narrow local Gemini CLI wrapper for valida
 
 The fixture tests exercise the wrapper on Unix only. Gemini CLI v0.62.0's headless flags were independently inspected, but no authenticated Gemini response has been executed. This is a ping-only adapter boundary, not real provider execution: it does not materialize credentials, accept encrypted task envelopes, run arbitrary prompts, preserve sessions, or participate in GitHub workflows. A real Gemini task adapter must add those capabilities only after the executor service and its credential boundary are implemented.
 
+## ACP client
+
+The Rust core implements a synchronous ACP v1 newline-delimited JSON-RPC stdio client pinned to `schema/v1/schema.json` and `schema/v1/meta.json` at agent-client-protocol commit `212f0cace08a42309c7cbcefb74119b9d02d24bc`. `cai acp run --spec <acp-run.yaml>` loads a strict YAML run specification, reads the prompt from a separate file, runs the configured executable directly, and emits one normalized JSON result document.
+
+The client clears the child environment and supplies only explicitly selected variables, advertises no client filesystem or terminal capability, rejects permissions by default, never selects `allow_always`, and performs authentication only with an operator-approved advertised agent method without fallback. It withholds stderr content while recording its byte count, bounds protocol lines and evidence data, snapshots changed files without following symlinks, and kills and reaps the agent's whole process group after every outcome, including a clean exit, so background descendants cannot outlive the run. Write failures, a removed or unreadable workspace, and other agent behavior produce a normalized result rather than discarding evidence; an incomplete workspace snapshot is reported as `truncated`. Unix execution uses a dedicated process group; portable protocol tests and Unix shell fixtures cover the boundary.
+
+This fixture-tested slice has not run a real agent. It provides no pinned Codex or other ACP adapter, provider credential materialization, task container, encrypted-envelope or executor integration, or GitHub dispatch. Those trust-boundary proofs remain future work.
+
 ## GitHub Action distribution
 
 The thin TypeScript Action wrapper downloads the Linux x86_64 Rust binary from an immutable URL and verifies its published SHA-256 checksum before execution. It invokes `cai mock run` with explicit policy, repository, evidence-root, SQLite-ledger, and run-ID inputs; then it validates the one-document JSON result and publishes the plan-only outcome, provider/model, evidence directory, and run ID as Action outputs.
