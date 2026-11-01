@@ -32,7 +32,7 @@ The initial test baseline is `cargo test` for Rust and `node --test` for the Typ
 ## First local POC
 
 - The first deployment is a local CAI host with SQLite state. It reaches GitHub through outbound API calls; it does not require a public listener, tunnel, or inbound port forwarding for executor dispatch.
-- The first host has no inbound GitHub listener. It discovers CAI labels and commands, and retrieves encrypted executor results, by polling the GitHub API. Webhook ingress is deferred to managed integration.
+- The first host has no inbound GitHub listener. It discovers CAI labels and commands, and retrieves encrypted executor results, by polling the GitHub API. Webhook ingress is a planned second ingress mode that must feed the same normalized event record; polling is implemented first.
 - Compose secrets, when Compose is used, are mounted read-only. Do not use environment variables, command lines, logs, artifacts, or SQLite for credentials.
 - The first vertical proof runs plan-only on `Eugene239/CAI` with the deterministic mock provider. It must not create a code change or pull request.
 

@@ -49,7 +49,7 @@ Installation tokens, `GITHUB_TOKEN`, OAuth access tokens, provider credentials, 
 
 ## Event polling and pull-request delivery
 
-The self-hosted CAI host needs no inbound connectivity from GitHub. It polls issue events and comments for connected repositories with a fresh installation token, keeps durable cursors and processed-event records, and polls executor workflow runs for their encrypted result artifacts. Webhook ingress is deferred to managed integration.
+The self-hosted CAI host needs no inbound connectivity from GitHub. It polls issue events and comments for connected repositories with a fresh installation token, keeps durable cursors and processed-event records, and polls executor workflow runs for their encrypted result artifacts. Webhook ingress is a planned second mode for deployments that can receive GitHub deliveries; it feeds the same normalized event pipeline.
 
 The generated workflows receive no App private key, no installation token, and no repository secret containing one. The CAI host delivers pull requests itself: it decrypts and validates the executor result, then creates or updates the delivery branch and the ready-for-review pull request with a fresh installation token restricted to that repository. Pull requests created by the App identity trigger repository-native CI.
 
