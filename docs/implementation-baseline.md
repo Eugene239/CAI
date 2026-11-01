@@ -51,7 +51,7 @@ The Rust core also has a deliberately narrow local Gemini CLI wrapper for valida
 
 `--workspace` is an operator-local diagnostic input, not an untrusted task path. Gemini CLI can load project configuration and `.env` files from its workspace hierarchy, and this ping prototype does not enforce a workspace root or establish a filesystem security boundary; operators must provide a disposable trusted directory.
 
-The fixture tests exercise the wrapper on Unix only. Gemini CLI v0.62.0's headless flags were independently inspected, but no authenticated Gemini response has been executed. This is a ping-only adapter boundary, not real provider execution: it does not materialize credentials, accept encrypted task envelopes, run arbitrary prompts, preserve sessions, or participate in GitHub workflows. A real Gemini task adapter must add those capabilities only after the executor service and its credential boundary are implemented.
+The fixture tests exercise the wrapper on Unix only. Gemini CLI v0.62.0's headless flags were independently inspected, but no authenticated Gemini response has been executed. With Gemini CLI v0.63.0, a personal Google login on the free "Gemini Code Assist for individuals" tier fails with `IneligibleTierError` (`UNSUPPORTED_CLIENT`); the remaining Gemini CLI authentication paths are API keys or Vertex AI, which the subscription-session operating model does not accept. Gemini CLI's native `--acp` mode completed `initialize` with CAI's ACP client, and `session/new` then failed closed as `authentication-required`. This is a ping-only adapter boundary, not real provider execution: it does not materialize credentials, accept encrypted task envelopes, run arbitrary prompts, preserve sessions, or participate in GitHub workflows. A real Gemini task adapter must add those capabilities only after the executor service and its credential boundary are implemented.
 
 ## ACP client
 
@@ -59,7 +59,25 @@ The Rust core implements a synchronous ACP v1 newline-delimited JSON-RPC stdio c
 
 The client clears the child environment and supplies only explicitly selected variables, advertises no client filesystem or terminal capability, rejects permissions by default, never selects `allow_always`, and performs authentication only with an operator-approved advertised agent method without fallback. It withholds stderr content while recording its byte count, bounds protocol lines and evidence data, snapshots changed files without following symlinks, and kills and reaps the agent's whole process group after every outcome, including a clean exit, so background descendants cannot outlive the run. Write failures, a removed or unreadable workspace, and other agent behavior produce a normalized result rather than discarding evidence; an incomplete workspace snapshot is reported as `truncated`. Unix execution uses a dedicated process group; portable protocol tests and Unix shell fixtures cover the boundary.
 
-This fixture-tested slice has not run a real agent. It provides no pinned Codex or other ACP adapter, provider credential materialization, task container, encrypted-envelope or executor integration, or GitHub dispatch. Those trust-boundary proofs remain future work.
+The client itself ships no agent, ACP adapter, provider credential materialization, task container, encrypted-envelope or executor integration, or GitHub dispatch.
+
+### First Codex ACP spike
+
+A manual, operator-run spike drove a real Codex session through `cai acp run` in a disposable Linux container:
+
+- Agent: `@agentclientprotocol/codex-acp@2.5.0` with `@openai/codex@0.165.0` selected through `CODEX_PATH`, both installed at exact versions. Package integrity digests were not verified before execution.
+- Authentication: an existing ChatGPT subscription login (`auth_mode: chatgpt`). Only `auth.json` and a one-line `config.toml` (`cli_auth_credentials_store = "file"`) were copied into a private per-task `CODEX_HOME` owned by an unprivileged user. `NO_BROWSER=1` hid browser login, no auth method was approved, and `session/new` succeeded from the materialized file. No API key was present.
+- Environment: only `HOME`, `PATH`, `CODEX_HOME`, `CODEX_PATH`, `NO_BROWSER`, and `INITIAL_AGENT_MODE` reached the agent.
+
+| Run | Codex mode / CAI permission policy | Result |
+| --- | --- | --- |
+| ping | `read-only` / `reject` | `completed`; agent message exactly `CAI_PONG`; no workspace change |
+| write | `workspace-write` / `allow-once` | `completed`; one `exec` permission answered `allow-once`; `changed_files.added` reported the requested file with the exact content |
+| reject | `workspace-write` / `reject` | `cancelled`; the permission was answered `reject-once`, Codex ended the turn, and no file was created |
+
+The materialized `auth.json` was byte-identical after the runs, so no token refresh occurred, and the copy was deleted afterwards. Result documents contained no token material.
+
+Observed gaps, deliberately left for later: a rejected permission surfaces as `cancelled` and is not yet distinguishable from operator cancellation; after the rejected turn the adapter did not exit within the grace period and was killed, so no exit code was recorded; Codex writes substantial state (SQLite databases, session logs) into `CODEX_HOME`, which must stay inside per-task private storage. Token refresh and expiry handling, refreshed-state handback, cancellation and timeout against a real agent, package digest verification, and execution inside an executor task container without GitHub authority remain unproven.
 
 ## GitHub Action distribution
 

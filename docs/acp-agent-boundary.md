@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted architecture decision. CAI uses a small Rust Agent Client Protocol (ACP) client as its primary coding-agent integration boundary. The client is implemented and tested against local fixtures only. The required-evidence items below remain unproven for every real provider path, and no provider session flow or GitHub executor workflow is enabled by this status.
+Accepted architecture decision. CAI uses a small Rust Agent Client Protocol (ACP) client as its primary coding-agent integration boundary. The client is implemented and fixture-tested. One manual Codex spike with a ChatGPT subscription login completed real prompt turns through it, covering parts of evidence items 2 and 3 below; see [the spike record](implementation-baseline.md#first-codex-acp-spike). The remaining required-evidence items are unproven for every real provider path, and no provider session flow or GitHub executor workflow is enabled by this status.
 
 ## Decision
 
