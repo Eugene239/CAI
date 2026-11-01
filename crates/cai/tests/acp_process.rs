@@ -22,6 +22,25 @@ fn serial() -> MutexGuard<'static, ()> {
         .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
+// A killed orphan may linger as a zombie until its reaper (often not PID 1
+// on CI runners) collects it; a zombie no longer runs, so it counts as gone.
+fn process_gone(pid: i32) -> bool {
+    for _ in 0..100 {
+        if nix::sys::signal::kill(nix::unistd::Pid::from_raw(pid), None).is_err() {
+            return true;
+        }
+        if let Ok(stat) = fs::read_to_string(format!("/proc/{pid}/stat"))
+            && stat
+                .rsplit_once(')')
+                .is_some_and(|(_, rest)| rest.trim_start().starts_with('Z'))
+        {
+            return true;
+        }
+        thread::sleep(Duration::from_millis(20));
+    }
+    false
+}
+
 fn dir(n: &str) -> std::path::PathBuf {
     let p = std::env::temp_dir().join(format!(
         "cai-acp-process-{n}-{}-{}",
@@ -109,7 +128,7 @@ sleep 30
         .trim()
         .parse()
         .unwrap();
-    assert!(nix::sys::signal::kill(nix::unistd::Pid::from_raw(pid), None).is_err());
+    assert!(process_gone(pid));
     fs::remove_dir_all(p).unwrap()
 }
 
@@ -129,8 +148,7 @@ fn completed_run_still_kills_background_grandchildren() {
         .trim()
         .parse()
         .unwrap();
-    thread::sleep(Duration::from_millis(100));
-    assert!(nix::sys::signal::kill(nix::unistd::Pid::from_raw(pid), None).is_err());
+    assert!(process_gone(pid));
     fs::remove_file(pid_file).unwrap();
     fs::remove_dir_all(p).unwrap()
 }
